@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Test that autoflake performs correctly on arbitrary Python files.
 
 This checks that autoflake never introduces incorrect syntax. This is
@@ -216,9 +215,12 @@ def check(args):
     filenames = dir_paths
     completed_filenames = set()
 
+    files_to_skip = {"bad_coding.py"}
+
     while filenames:
         try:
             name = os.path.realpath(filenames.pop(0))
+            basename = os.path.basename(name)
             if not os.path.exists(name):
                 # Invalid symlink.
                 continue
@@ -240,7 +242,7 @@ def check(args):
                     ]
 
                     directories[:] = [d for d in directories if not d.startswith(".")]
-            else:
+            elif basename not in files_to_skip:
                 verbose_message = "--->  Testing with " + name
                 sys.stderr.write(colored(verbose_message + "\n", YELLOW))
 
