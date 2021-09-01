@@ -3,6 +3,7 @@ import contextlib
 import functools
 import io
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -12,25 +13,13 @@ import unittest
 
 import autoflake
 
-ROOT_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
+ROOT_DIRECTORY = pathlib.Path(__file__).parent.parent
 
 
-if "AUTOFLAKE_COVERAGE" in os.environ and int(os.environ["AUTOFLAKE_COVERAGE"]):
-    AUTOFLAKE_COMMAND = [
-        "coverage",
-        "run",
-        "--branch",
-        "--parallel",
-        "--omit=*/distutils/*,*/site-packages/*",
-        os.path.join(ROOT_DIRECTORY, "autoflake.py"),
-    ]
-else:
-    # We need to specify the executable to make sure the correct Python
-    # interpreter gets used.
-    AUTOFLAKE_COMMAND = [
-        sys.executable,
-        os.path.join(ROOT_DIRECTORY, "autoflake.py"),
-    ]  # pragma: no cover
+AUTOFLAKE_COMMAND = [
+    sys.executable,
+    ROOT_DIRECTORY / "autoflake.py",
+]
 
 
 class UnitTests(unittest.TestCase):
@@ -886,10 +875,6 @@ def bar():
         x = 2
 """
         self.assertEqual(code, autoflake.fix_code(code, remove_unused_variables=True))
-
-    def test_detect_encoding_with_bad_encoding(self):
-        with temporary_file("# -*- coding: blah -*-\n") as filename:
-            self.assertEqual("latin-1", autoflake.detect_encoding(filename))
 
     def test_fix_code_with_comma_on_right(self):
         """pyflakes does not handle nonlocal correctly."""

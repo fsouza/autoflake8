@@ -47,22 +47,14 @@ _LOGGER.propagate = False
 
 ATOMS = frozenset([tokenize.NAME, tokenize.NUMBER, tokenize.STRING])
 
-EXCEPT_REGEX = re.compile(r"^\s*except [\s,()\w]+ as \w+:$")
-PYTHON_SHEBANG_REGEX = re.compile(r"^#!.*\bpython[23]?\b\s*$")
 
-MAX_PYTHON_FILE_DETECTION_BYTES = 1024
-
-try:
-    unicode
-except NameError:
-    unicode = str
-
-
-try:
-    RecursionError
-except NameError:
-    # Python before 3.5.
-    RecursionError = RuntimeError
+class Regex:
+    BASE_MODULE = re.compile(r"\bfrom\s+([^ ]+)")
+    DEL = re.compile(r"\bdel\b")
+    DUNDER_ALL = re.compile(r"\b__all__\b")
+    EXCEPT = re.compile(r"^\s*except [\s,()\w]+ as \w+:$")
+    INDENTATION = re.compile(r"^\s*")
+    PYTHON_SHEBANG = re.compile(rb"^#!.*\bpython3?\b\s*$")
 
 
 def standard_paths():
@@ -127,12 +119,12 @@ def unused_import_line_numbers(messages):
 
 def unused_import_module_name(messages):
     """Yield line number and module name of unused imports."""
-    pattern = r"\'(.+?)\'"
+    regex = re.compile("'(.+?)'")
     for message in messages:
         if isinstance(message, pyflakes.messages.UnusedImport):
-            module_name = re.search(pattern, str(message))
-            module_name = module_name.group()[1:-1]
+            module_name = regex.search(str(message))
             if module_name:
+                module_name = module_name.group()[1:-1]
                 yield (message.lineno, module_name)
 
 
@@ -199,15 +191,6 @@ def create_key_to_messages_dict(messages):
 
 def check(source):
     """Return messages from pyflakes."""
-    if sys.version_info[0] == 2 and isinstance(source, unicode):
-        # Convert back to original byte string encoding, otherwise pyflakes
-        # call to compile() will complain. See PEP 263. This only affects
-        # Python 2.
-        try:
-            source = source.encode("utf-8")
-        except UnicodeError:  # pragma: no cover
-            return []
-
     reporter = ListReporter()
     try:
         pyflakes.api.check(source, filename="<string>", reporter=reporter)
@@ -347,10 +330,8 @@ class FilterMultilineImport(PendingFix):
     """
 
     IMPORT_RE = re.compile(r"\bimport\b\s*")
-    INDENTATION_RE = re.compile(r"^\s*")
     BASE_RE = re.compile(r"\bfrom\s+([^ ]+)")
     SEGMENT_RE = re.compile(r"([^,\s]+(?:[\s\\]+as[\s\\]+[^,\s]+)?[,\s\\)]*)", re.M)
-    # ^ module + comma + following space (including new line and continuation)
     IDENTIFIER_RE = re.compile(r"[^,\s]+")
 
     def __init__(
@@ -433,8 +414,10 @@ class FilterMultilineImport(PendingFix):
         # Replace empty imports with a "pass" statement
         empty = len(fixed.strip(string.whitespace + "\\(),")) < 1
         if empty:
-            indentation = self.INDENTATION_RE.search(self.from_).group(0)
-            return indentation + "pass" + ending
+            indentation_match = Regex.INDENTATION.search(self.from_)
+            if indentation_match:
+                indentation = indentation_match.group(0)
+                return indentation + "pass" + ending
 
         return self.from_ + "import " + fixed
 
@@ -469,7 +452,11 @@ def filter_from_import(line, unused_module):
     module in import is unused.
     """
     (indentation, imports) = re.split(pattern=r"\bimport\b", string=line, maxsplit=1)
-    base_module = re.search(pattern=r"\bfrom\s+([^ ]+)", string=indentation).group(1)
+    base_module_match = Regex.BASE_MODULE.search(indentation)
+    if base_module_match:
+        base_module = base_module_match.group(1)
+    else:
+        base_module = None
 
     imports = re.split(pattern=r"\s*,\s*", string=imports.strip())
     filtered_imports = _filter_imports(imports, base_module, unused_module)
@@ -531,6 +518,7 @@ def filter_code(
     for line_number, module_name in unused_import_module_name(messages):
         marked_unused_module[line_number].append(module_name)
 
+    undefined_names = []
     if expand_star_imports and not (
         # See explanations in #18.
         re.search(r"\b__all__\b", source)
@@ -543,8 +531,7 @@ def filter_code(
             # Auto expanding only possible for single star import
             marked_star_import_line_numbers = frozenset()
         else:
-            undefined_names = []
-            for line_number, undefined_name, _ in star_import_usage_undefined_name(
+            for _, undefined_name, _ in star_import_usage_undefined_name(
                 messages,
             ):
                 undefined_names.append(undefined_name)
@@ -564,8 +551,6 @@ def filter_code(
         )
     else:
         marked_key_line_numbers = frozenset()
-
-    line_messages = get_messages_by_line(messages)
 
     sio = io.StringIO(source)
     previous_line = ""
@@ -588,10 +573,8 @@ def filter_code(
         elif line_number in marked_key_line_numbers:
             result = filter_duplicate_key(
                 line,
-                line_messages[line_number],
                 line_number,
                 marked_key_line_numbers,
-                source,
             )
         elif line_number in marked_star_import_line_numbers:
             result = filter_star_import(line, undefined_names)
@@ -662,7 +645,7 @@ def filter_unused_import(
 
 def filter_unused_variable(line, previous_line=""):
     """Return line if used, otherwise return None."""
-    if re.match(EXCEPT_REGEX, line):
+    if re.match(Regex.EXCEPT, line):
         return re.sub(r" as \w+:$", ":", line, count=1)
     elif multiline_statement(line, previous_line):
         return line
@@ -685,11 +668,8 @@ def filter_unused_variable(line, previous_line=""):
 
 def filter_duplicate_key(
     line,
-    message,
     line_number,
     marked_line_numbers,
-    source,
-    previous_line="",
 ):
     """Return '' if first occurrence of the key otherwise return `line`."""
     if marked_line_numbers and line_number == sorted(marked_line_numbers)[0]:
@@ -853,19 +833,17 @@ def fix_code(
 
 def fix_file(filename, args, standard_out):
     """Run fix_code() on a file."""
-    encoding = detect_encoding(filename)
-    with open_with_encoding(filename, encoding=encoding) as input_file:
+    with open(filename) as input_file:
         return _fix_file(
             input_file,
             filename,
             args,
             args.write_to_stdout,
             standard_out,
-            encoding=encoding,
         )
 
 
-def _fix_file(input_file, filename, args, write_to_stdout, standard_out, encoding=None):
+def _fix_file(input_file, filename, args, write_to_stdout, standard_out):
     source = input_file.read()
     original_source = source
 
@@ -897,11 +875,7 @@ def _fix_file(input_file, filename, args, write_to_stdout, standard_out, encodin
         if write_to_stdout:
             standard_out.write(filtered_source)
         elif args.in_place:
-            with open_with_encoding(
-                filename,
-                mode="w",
-                encoding=encoding,
-            ) as output_file:
+            with open(filename, mode="w") as output_file:
                 output_file.write(filtered_source)
             _LOGGER.info("Fixed %s", filename)
         else:
@@ -918,45 +892,6 @@ def _fix_file(input_file, filename, args, write_to_stdout, standard_out, encodin
             standard_out.write("No issues detected!\n")
         else:
             _LOGGER.debug("Clean %s: nothing to fix", filename)
-
-
-def open_with_encoding(filename, encoding, mode="r", limit_byte_check=-1):
-    """Return opened file with a specific encoding."""
-    if not encoding:
-        encoding = detect_encoding(filename, limit_byte_check=limit_byte_check)
-
-    return open(
-        filename,
-        mode=mode,
-        encoding=encoding,
-        newline="",
-    )  # Preserve line endings
-
-
-def detect_encoding(filename, limit_byte_check=-1):
-    """Return file encoding."""
-    try:
-        with open(filename, "rb") as input_file:
-            encoding = _detect_encoding(input_file.readline)
-
-            # Check for correctness of encoding.
-            with open_with_encoding(filename, encoding) as input_file:
-                input_file.read(limit_byte_check)
-
-        return encoding
-    except (LookupError, SyntaxError, UnicodeDecodeError):
-        return "latin-1"
-
-
-def _detect_encoding(readline):
-    """Return file encoding."""
-    try:
-        from lib2to3.pgen2 import tokenize as lib2to3_tokenize
-
-        encoding = lib2to3_tokenize.detect_encoding(readline)[0]
-        return encoding
-    except (LookupError, SyntaxError, UnicodeDecodeError):
-        return "latin-1"
 
 
 def get_diff_text(old, new, filename):
@@ -991,20 +926,17 @@ def is_python_file(filename):
     if filename.endswith(".py"):
         return True
 
+    max_python_file_detection_bytes = 1024
     try:
-        with open_with_encoding(
-            filename,
-            None,
-            limit_byte_check=MAX_PYTHON_FILE_DETECTION_BYTES,
-        ) as f:
-            text = f.read(MAX_PYTHON_FILE_DETECTION_BYTES)
+        with open(filename, "rb") as f:
+            text = f.read(max_python_file_detection_bytes)
             if not text:
                 return False
             first_line = text.splitlines()[0]
     except (OSError, IndexError):
         return False
 
-    if not PYTHON_SHEBANG_REGEX.match(first_line):
+    if not Regex.PYTHON_SHEBANG.match(first_line):
         return False
 
     return True
@@ -1194,7 +1126,7 @@ def _main(argv, standard_out, standard_error, standard_input=None):
             try:
                 fix_file(name, args=args, standard_out=standard_out)
             except OSError as exception:
-                _LOGGER.error(unicode(exception))
+                _LOGGER.error(str(exception))
                 failure = True
 
     return 1 if failure else 0
