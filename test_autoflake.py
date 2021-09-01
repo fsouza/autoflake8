@@ -1,10 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 """Test suite for autoflake."""
-
-from __future__ import unicode_literals
-
 import contextlib
 import functools
 import io
@@ -15,28 +9,28 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest import mock
 
 import autoflake
-
 
 ROOT_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
 
 
-if (
-    'AUTOFLAKE_COVERAGE' in os.environ and
-    int(os.environ['AUTOFLAKE_COVERAGE'])
-):
-    AUTOFLAKE_COMMAND = ['coverage', 'run', '--branch', '--parallel',
-                         '--omit=*/distutils/*,*/site-packages/*',
-                         os.path.join(ROOT_DIRECTORY, 'autoflake.py')]
+if "AUTOFLAKE_COVERAGE" in os.environ and int(os.environ["AUTOFLAKE_COVERAGE"]):
+    AUTOFLAKE_COMMAND = [
+        "coverage",
+        "run",
+        "--branch",
+        "--parallel",
+        "--omit=*/distutils/*,*/site-packages/*",
+        os.path.join(ROOT_DIRECTORY, "autoflake.py"),
+    ]
 else:
     # We need to specify the executable to make sure the correct Python
     # interpreter gets used.
-    AUTOFLAKE_COMMAND = [sys.executable,
-                         os.path.join(
-                             ROOT_DIRECTORY,
-                             'autoflake.py')]  # pragma: no cover
+    AUTOFLAKE_COMMAND = [
+        sys.executable,
+        os.path.join(ROOT_DIRECTORY, "autoflake.py"),
+    ]  # pragma: no cover
 
 
 class UnitTests(unittest.TestCase):
@@ -49,110 +43,112 @@ class UnitTests(unittest.TestCase):
     def test_unused_import_line_numbers(self):
         self.assertEqual(
             [1],
-            list(autoflake.unused_import_line_numbers(
-                autoflake.check('import os\n'))))
+            list(autoflake.unused_import_line_numbers(autoflake.check("import os\n"))),
+        )
 
     def test_unused_import_line_numbers_with_from(self):
         self.assertEqual(
             [1],
-            list(autoflake.unused_import_line_numbers(
-                autoflake.check('from os import path\n'))))
+            list(
+                autoflake.unused_import_line_numbers(
+                    autoflake.check("from os import path\n"),
+                ),
+            ),
+        )
 
     def test_unused_import_line_numbers_with_dot(self):
         self.assertEqual(
             [1],
-            list(autoflake.unused_import_line_numbers(
-                autoflake.check('import os.path\n'))))
+            list(
+                autoflake.unused_import_line_numbers(
+                    autoflake.check("import os.path\n"),
+                ),
+            ),
+        )
 
     def test_extract_package_name(self):
-        self.assertEqual('os', autoflake.extract_package_name('import os'))
-        self.assertEqual(
-            'os', autoflake.extract_package_name('from os import path'))
-        self.assertEqual(
-            'os', autoflake.extract_package_name('import os.path'))
+        self.assertEqual("os", autoflake.extract_package_name("import os"))
+        self.assertEqual("os", autoflake.extract_package_name("from os import path"))
+        self.assertEqual("os", autoflake.extract_package_name("import os.path"))
 
     def test_extract_package_name_should_ignore_doctest_for_now(self):
-        self.assertFalse(autoflake.extract_package_name('>>> import os'))
+        self.assertFalse(autoflake.extract_package_name(">>> import os"))
 
     def test_standard_package_names(self):
-        self.assertIn('os', list(autoflake.standard_package_names()))
-        self.assertIn('subprocess', list(autoflake.standard_package_names()))
-        self.assertIn('urllib', list(autoflake.standard_package_names()))
+        self.assertIn("os", list(autoflake.standard_package_names()))
+        self.assertIn("subprocess", list(autoflake.standard_package_names()))
+        self.assertIn("urllib", list(autoflake.standard_package_names()))
 
-        self.assertNotIn('autoflake', list(autoflake.standard_package_names()))
-        self.assertNotIn('pep8', list(autoflake.standard_package_names()))
+        self.assertNotIn("autoflake", list(autoflake.standard_package_names()))
+        self.assertNotIn("pep8", list(autoflake.standard_package_names()))
 
     def test_get_line_ending(self):
-        self.assertEqual('\n', autoflake.get_line_ending('\n'))
-        self.assertEqual('\n', autoflake.get_line_ending('abc\n'))
-        self.assertEqual('\t  \t\n', autoflake.get_line_ending('abc\t  \t\n'))
+        self.assertEqual("\n", autoflake.get_line_ending("\n"))
+        self.assertEqual("\n", autoflake.get_line_ending("abc\n"))
+        self.assertEqual("\t  \t\n", autoflake.get_line_ending("abc\t  \t\n"))
 
-        self.assertEqual('', autoflake.get_line_ending('abc'))
-        self.assertEqual('', autoflake.get_line_ending(''))
+        self.assertEqual("", autoflake.get_line_ending("abc"))
+        self.assertEqual("", autoflake.get_line_ending(""))
 
     def test_get_indentation(self):
-        self.assertEqual('', autoflake.get_indentation(''))
-        self.assertEqual('    ', autoflake.get_indentation('    abc'))
-        self.assertEqual('    ', autoflake.get_indentation('    abc  \n\t'))
-        self.assertEqual('\t', autoflake.get_indentation('\tabc  \n\t'))
-        self.assertEqual(' \t ', autoflake.get_indentation(' \t abc  \n\t'))
-        self.assertEqual('', autoflake.get_indentation('    '))
+        self.assertEqual("", autoflake.get_indentation(""))
+        self.assertEqual("    ", autoflake.get_indentation("    abc"))
+        self.assertEqual("    ", autoflake.get_indentation("    abc  \n\t"))
+        self.assertEqual("\t", autoflake.get_indentation("\tabc  \n\t"))
+        self.assertEqual(" \t ", autoflake.get_indentation(" \t abc  \n\t"))
+        self.assertEqual("", autoflake.get_indentation("    "))
 
     def test_filter_star_import(self):
         self.assertEqual(
-            'from math import cos',
-            autoflake.filter_star_import('from math import *',
-                                         ['cos']))
+            "from math import cos",
+            autoflake.filter_star_import("from math import *", ["cos"]),
+        )
 
         self.assertEqual(
-            'from math import cos, sin',
-            autoflake.filter_star_import('from math import *',
-                                         ['sin', 'cos']))
+            "from math import cos, sin",
+            autoflake.filter_star_import("from math import *", ["sin", "cos"]),
+        )
 
     def test_filter_unused_variable(self):
-        self.assertEqual('foo()',
-                         autoflake.filter_unused_variable('x = foo()'))
+        self.assertEqual("foo()", autoflake.filter_unused_variable("x = foo()"))
 
-        self.assertEqual('    foo()',
-                         autoflake.filter_unused_variable('    x = foo()'))
+        self.assertEqual("    foo()", autoflake.filter_unused_variable("    x = foo()"))
 
     def test_filter_unused_variable_with_literal_or_name(self):
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = 1'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = 1"))
 
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = y'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = y"))
 
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = {}'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = {}"))
 
     def test_filter_unused_variable_with_basic_data_structures(self):
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = dict()'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = dict()"))
 
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = list()'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = list()"))
 
-        self.assertEqual('pass',
-                         autoflake.filter_unused_variable('x = set()'))
+        self.assertEqual("pass", autoflake.filter_unused_variable("x = set()"))
 
     def test_filter_unused_variable_should_ignore_multiline(self):
-        self.assertEqual('x = foo()\\',
-                         autoflake.filter_unused_variable('x = foo()\\'))
+        self.assertEqual("x = foo()\\", autoflake.filter_unused_variable("x = foo()\\"))
 
     def test_filter_unused_variable_should_multiple_assignments(self):
-        self.assertEqual('x = y = foo()',
-                         autoflake.filter_unused_variable('x = y = foo()'))
+        self.assertEqual(
+            "x = y = foo()",
+            autoflake.filter_unused_variable("x = y = foo()"),
+        )
 
     def test_filter_unused_variable_with_exception(self):
         self.assertEqual(
-            'except Exception:',
-            autoflake.filter_unused_variable('except Exception as exception:'))
+            "except Exception:",
+            autoflake.filter_unused_variable("except Exception as exception:"),
+        )
 
         self.assertEqual(
-            'except (ImportError, ValueError):',
+            "except (ImportError, ValueError):",
             autoflake.filter_unused_variable(
-                'except (ImportError, ValueError) as foo:'))
+                "except (ImportError, ValueError) as foo:",
+            ),
+        )
 
     def test_filter_code(self):
         self.assertEqual(
@@ -161,11 +157,16 @@ import os
 pass
 os.foo()
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import os
 import re
 os.foo()
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_with_indented_import(self):
         self.assertEqual(
@@ -175,12 +176,17 @@ if True:
     pass
 os.foo()
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import os
 if True:
     import re
 os.foo()
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_with_from(self):
         self.assertEqual(
@@ -188,10 +194,15 @@ os.foo()
 pass
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from os import path
 x = 1
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_with_not_from(self):
         self.assertEqual(
@@ -199,11 +210,16 @@ x = 1
 pass
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import frommer
 x = 1
 """,
-                                          remove_all_unused_imports=True)))
+                    remove_all_unused_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_with_used_from(self):
         self.assertEqual(
@@ -211,21 +227,31 @@ x = 1
 import frommer
 print(frommer)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import frommer
 print(frommer)
 """,
-                                          remove_all_unused_imports=True)))
+                    remove_all_unused_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_with_ambiguous_from(self):
         self.assertEqual(
             """\
 pass
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from frommer import abc, frommer, xyz
 """,
-                                          remove_all_unused_imports=True)))
+                    remove_all_unused_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_should_avoid_inline_except(self):
         line = """\
@@ -234,8 +260,8 @@ except: from zap import bar
 """
         self.assertEqual(
             line,
-            ''.join(autoflake.filter_code(line,
-                                          remove_all_unused_imports=True)))
+            "".join(autoflake.filter_code(line, remove_all_unused_imports=True)),
+        )
 
     def test_filter_code_should_avoid_escaped_newlines(self):
         line = """\
@@ -246,8 +272,8 @@ from zap import bar
 """
         self.assertEqual(
             line,
-            ''.join(autoflake.filter_code(line,
-                                          remove_all_unused_imports=True)))
+            "".join(autoflake.filter_code(line, remove_all_unused_imports=True)),
+        )
 
     def test_filter_code_with_remove_all_unused_imports(self):
         self.assertEqual(
@@ -256,11 +282,17 @@ pass
 pass
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import foo
 import zap
 x = 1
-""", remove_all_unused_imports=True)))
+""",
+                    remove_all_unused_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_with_additional_imports(self):
         self.assertEqual(
@@ -269,11 +301,17 @@ pass
 import zap
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import foo
 import zap
 x = 1
-""", additional_imports=['foo', 'bar'])))
+""",
+                    additional_imports=["foo", "bar"],
+                ),
+            ),
+        )
 
     def test_filter_code_should_ignore_imports_with_inline_comment(self):
         self.assertEqual(
@@ -283,12 +321,17 @@ pass
 from fake_foo import z  # foo, foo, zap
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from os import path  # foo
 from os import path
 from fake_foo import z  # foo, foo, zap
 x = 1
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_should_respect_noqa(self):
         self.assertEqual(
@@ -298,12 +341,17 @@ import re  # noqa
 from subprocess import Popen  # NOQA
 x = 1
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from os import path
 import re  # noqa
 from subprocess import Popen  # NOQA
 x = 1
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_expand_star_imports(self):
         self.assertEqual(
@@ -311,10 +359,16 @@ x = 1
 from math import sin
 sin(1)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from math import *
 sin(1)
-""", expand_star_imports=True)))
+""",
+                    expand_star_imports=True,
+                ),
+            ),
+        )
 
         self.assertEqual(
             """\
@@ -322,11 +376,17 @@ from math import cos, sin
 sin(1)
 cos(1)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from math import *
 sin(1)
 cos(1)
-""", expand_star_imports=True)))
+""",
+                    expand_star_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_ignore_multiple_star_import(self):
         self.assertEqual(
@@ -336,12 +396,18 @@ from re import *
 sin(1)
 cos(1)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 from math import *
 from re import *
 sin(1)
 cos(1)
-""", expand_star_imports=True)))
+""",
+                    expand_star_imports=True,
+                ),
+            ),
+        )
 
     def test_filter_code_with_special_re_symbols_in_key(self):
         self.assertEqual(
@@ -351,78 +417,103 @@ a = {
 }
 print(a)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 a = {
   '????': 3,
   '????': 2,
 }
 print(a)
-""", remove_duplicate_keys=True)))
+""",
+                    remove_duplicate_keys=True,
+                ),
+            ),
+        )
 
     def test_multiline_import(self):
-        self.assertTrue(autoflake.multiline_import(r"""\
+        self.assertTrue(
+            autoflake.multiline_import(
+                r"""\
 import os, \
     math, subprocess
-"""))
+""",
+            ),
+        )
 
-        self.assertFalse(autoflake.multiline_import("""\
+        self.assertFalse(
+            autoflake.multiline_import(
+                """\
 import os, math, subprocess
-"""))
-
-        self.assertTrue(autoflake.multiline_import("""\
-import os, math, subprocess
-""", previous_line='if: \\\n'))
+""",
+            ),
+        )
 
         self.assertTrue(
-            autoflake.multiline_import('from os import (path, sep)'))
+            autoflake.multiline_import(
+                """\
+import os, math, subprocess
+""",
+                previous_line="if: \\\n",
+            ),
+        )
+
+        self.assertTrue(autoflake.multiline_import("from os import (path, sep)"))
 
     def test_multiline_statement(self):
-        self.assertFalse(autoflake.multiline_statement('x = foo()'))
+        self.assertFalse(autoflake.multiline_statement("x = foo()"))
 
-        self.assertTrue(autoflake.multiline_statement('x = 1;'))
-        self.assertTrue(autoflake.multiline_statement('import os, \\'))
-        self.assertTrue(autoflake.multiline_statement('foo('))
-        self.assertTrue(autoflake.multiline_statement('1',
-                                                      previous_line='x = \\'))
+        self.assertTrue(autoflake.multiline_statement("x = 1;"))
+        self.assertTrue(autoflake.multiline_statement("import os, \\"))
+        self.assertTrue(autoflake.multiline_statement("foo("))
+        self.assertTrue(autoflake.multiline_statement("1", previous_line="x = \\"))
 
     def test_break_up_import(self):
         self.assertEqual(
-            'import abc\nimport math\nimport subprocess\n',
-            autoflake.break_up_import('import abc, subprocess, math\n'))
+            "import abc\nimport math\nimport subprocess\n",
+            autoflake.break_up_import("import abc, subprocess, math\n"),
+        )
 
     def test_break_up_import_with_indentation(self):
         self.assertEqual(
-            '    import abc\n    import math\n    import subprocess\n',
-            autoflake.break_up_import('    import abc, subprocess, math\n'))
+            "    import abc\n    import math\n    import subprocess\n",
+            autoflake.break_up_import("    import abc, subprocess, math\n"),
+        )
 
     def test_break_up_import_should_do_nothing_on_no_line_ending(self):
         self.assertEqual(
-            'import abc, subprocess, math',
-            autoflake.break_up_import('import abc, subprocess, math'))
+            "import abc, subprocess, math",
+            autoflake.break_up_import("import abc, subprocess, math"),
+        )
 
     def test_filter_from_import_no_remove(self):
         self.assertEqual(
             """\
     from foo import abc, math, subprocess\n""",
             autoflake.filter_from_import(
-                '    from foo import abc, subprocess, math\n',
-                unused_module=[]))
+                "    from foo import abc, subprocess, math\n",
+                unused_module=[],
+            ),
+        )
 
     def test_filter_from_import_remove_module(self):
         self.assertEqual(
             """\
     from foo import math, subprocess\n""",
             autoflake.filter_from_import(
-                '    from foo import abc, subprocess, math\n',
-                unused_module=['foo.abc']))
+                "    from foo import abc, subprocess, math\n",
+                unused_module=["foo.abc"],
+            ),
+        )
 
     def test_filter_from_import_remove_all(self):
         self.assertEqual(
-            '    pass\n',
+            "    pass\n",
             autoflake.filter_from_import(
-                '    from foo import abc, subprocess, math\n',
-                unused_module=['foo.abc', 'foo.subprocess',
-                               'foo.math']))
+                "    from foo import abc, subprocess, math\n",
+                unused_module=["foo.abc", "foo.subprocess", "foo.math"],
+            ),
+        )
 
     def test_filter_code_multiline_imports(self):
         self.assertEqual(
@@ -432,13 +523,18 @@ pass
 import os
 os.foo()
 """,
-            ''.join(autoflake.filter_code(r"""\
+            "".join(
+                autoflake.filter_code(
+                    r"""\
 import os
 import re
 import os, \
     math, subprocess
 os.foo()
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_multiline_from_imports(self):
         self.assertEqual(
@@ -455,7 +551,9 @@ from os.path import \
     isdir
 isdir('42')
 """,
-            ''.join(autoflake.filter_code(r"""\
+            "".join(
+                autoflake.filter_code(
+                    r"""\
 import os
 import re
 from os.path import (
@@ -471,7 +569,10 @@ from os.path import \
     isfile \
     , isdir
 isdir('42')
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_should_ignore_semicolons(self):
         self.assertEqual(
@@ -481,12 +582,17 @@ pass
 import os; import math, subprocess
 os.foo()
 """,
-            ''.join(autoflake.filter_code(r"""\
+            "".join(
+                autoflake.filter_code(
+                    r"""\
 import os
 import re
 import os; import math, subprocess
 os.foo()
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_should_ignore_non_standard_library(self):
         self.assertEqual(
@@ -499,7 +605,9 @@ from my_package import subprocess
 from my_blah.my_blah_blah import blah
 os.foo()
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import os
 import my_own_module
 import re
@@ -507,7 +615,10 @@ from my_package import another_module
 from my_package import subprocess
 from my_blah.my_blah_blah import blah
 os.foo()
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_should_ignore_unsafe_imports(self):
         self.assertEqual(
@@ -518,13 +629,18 @@ pass
 pass
 print(1)
 """,
-            ''.join(autoflake.filter_code("""\
+            "".join(
+                autoflake.filter_code(
+                    """\
 import rlcompleter
 import sys
 import io
 import os
 print(1)
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_code_should_ignore_docstring(self):
         line = """
@@ -533,40 +649,41 @@ def foo():
     >>> import math
     '''
 """
-        self.assertEqual(line, ''.join(autoflake.filter_code(line)))
+        self.assertEqual(line, "".join(autoflake.filter_code(line)))
 
     def test_with_ignore_init_module_imports_flag(self):
         # Need a temp directory in order to specify file name as __init__.py
-        temp_directory = tempfile.mkdtemp(dir='.')
-        temp_file = os.path.join(temp_directory, '__init__.py')
+        temp_directory = tempfile.mkdtemp(dir=".")
+        temp_file = os.path.join(temp_directory, "__init__.py")
         try:
-            with open(temp_file, 'w') as output:
-                output.write('import re\n')
+            with open(temp_file, "w") as output:
+                output.write("import re\n")
 
             p = subprocess.Popen(
-                list(AUTOFLAKE_COMMAND) +
-                ['--ignore-init-module-imports', temp_file],
-                stdout=subprocess.PIPE)
-            result = p.communicate()[0].decode('utf-8')
+                list(AUTOFLAKE_COMMAND) + ["--ignore-init-module-imports", temp_file],
+                stdout=subprocess.PIPE,
+            )
+            result = p.communicate()[0].decode("utf-8")
 
-            self.assertNotIn('import re', result)
+            self.assertNotIn("import re", result)
         finally:
             shutil.rmtree(temp_directory)
 
     def test_without_ignore_init_module_imports_flag(self):
         # Need a temp directory in order to specify file name as __init__.py
-        temp_directory = tempfile.mkdtemp(dir='.')
-        temp_file = os.path.join(temp_directory, '__init__.py')
+        temp_directory = tempfile.mkdtemp(dir=".")
+        temp_file = os.path.join(temp_directory, "__init__.py")
         try:
-            with open(temp_file, 'w') as output:
-                output.write('import re\n')
+            with open(temp_file, "w") as output:
+                output.write("import re\n")
 
             p = subprocess.Popen(
                 list(AUTOFLAKE_COMMAND) + [temp_file],
-                stdout=subprocess.PIPE)
-            result = p.communicate()[0].decode('utf-8')
+                stdout=subprocess.PIPE,
+            )
+            result = p.communicate()[0].decode("utf-8")
 
-            self.assertIn('import re', result)
+            self.assertIn("import re", result)
         finally:
             shutil.rmtree(temp_directory)
 
@@ -580,7 +697,8 @@ os.foo()
 math.pi
 x = version
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 import os
 import re
 import abc, math, subprocess
@@ -588,7 +706,9 @@ from sys import exit, version
 os.foo()
 math.pi
 x = version
-"""))
+""",
+            ),
+        )
 
     def test_fix_code_with_from_and_as(self):
         self.assertEqual(
@@ -596,37 +716,49 @@ x = version
 from collections import namedtuple as xyz
 xyz
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from collections import defaultdict, namedtuple as xyz
 xyz
-"""))
+""",
+            ),
+        )
 
         self.assertEqual(
             """\
 from collections import namedtuple as xyz
 xyz
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from collections import defaultdict as abc, namedtuple as xyz
 xyz
-"""))
+""",
+            ),
+        )
 
         self.assertEqual(
             """\
 from collections import namedtuple
 namedtuple
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from collections import defaultdict as abc, namedtuple
 namedtuple
-"""))
+""",
+            ),
+        )
 
         self.assertEqual(
             """\
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from collections import defaultdict as abc, namedtuple as xyz
-"""))
+""",
+            ),
+        )
 
     def test_fix_code_with_from_with_and_without_remove_all(self):
         code = """\
@@ -636,11 +768,13 @@ from x import a as b, c as d
         self.assertEqual(
             """\
 """,
-            autoflake.fix_code(code, remove_all_unused_imports=True))
+            autoflake.fix_code(code, remove_all_unused_imports=True),
+        )
 
         self.assertEqual(
             code,
-            autoflake.fix_code(code, remove_all_unused_imports=False))
+            autoflake.fix_code(code, remove_all_unused_imports=False),
+        )
 
     def test_fix_code_with_from_and_depth_module(self):
         self.assertEqual(
@@ -648,20 +782,26 @@ from x import a as b, c as d
 from distutils.version import StrictVersion
 StrictVersion('1.0.0')
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from distutils.version import LooseVersion, StrictVersion
 StrictVersion('1.0.0')
-"""))
+""",
+            ),
+        )
 
         self.assertEqual(
             """\
 from distutils.version import StrictVersion as version
 version('1.0.0')
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 from distutils.version import LooseVersion, StrictVersion as version
 version('1.0.0')
-"""))
+""",
+            ),
+        )
 
     def test_fix_code_with_indented_from(self):
         self.assertEqual(
@@ -670,45 +810,52 @@ def z():
     from ctypes import POINTER, byref
     POINTER, byref
     """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 def z():
     from ctypes import c_short, c_uint, c_int, c_long, pointer, POINTER, byref
     POINTER, byref
-    """))
+    """,
+            ),
+        )
 
         self.assertEqual(
             """\
 def z():
     pass
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 def z():
     from ctypes import c_short, c_uint, c_int, c_long, pointer, POINTER, byref
-"""))
+""",
+            ),
+        )
 
     def test_fix_code_with_empty_string(self):
-        self.assertEqual(
-            '',
-            autoflake.fix_code(''))
+        self.assertEqual("", autoflake.fix_code(""))
 
     def test_fix_code_with_from_and_as_and_escaped_newline(self):
         """Make sure stuff after escaped newline is not lost."""
-        result = autoflake.fix_code("""\
+        result = autoflake.fix_code(
+            """\
 from collections import defaultdict, namedtuple \\
     as xyz
 xyz
-""")
+""",
+        )
         # We currently leave lines with escaped newlines as is. But in the
         # future this we may parse them and remove unused import accordingly.
         # For now, we'll work around it here.
-        result = re.sub(r' *\\\n *as ', ' as ', result)
+        result = re.sub(r" *\\\n *as ", " as ", result)
 
         self.assertEqual(
             """\
 from collections import namedtuple as xyz
 xyz
 """,
-            autoflake.fix_code(result))
+            autoflake.fix_code(result),
+        )
 
     def test_fix_code_with_unused_variables(self):
         self.assertEqual(
@@ -717,13 +864,16 @@ def main():
     y = 11
     print(y)
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 def main():
     x = 10
     y = 11
     print(y)
 """,
-                               remove_unused_variables=True))
+                remove_unused_variables=True,
+            ),
+        )
 
     def test_fix_code_with_unused_variables_should_skip_nonlocal(self):
         """pyflakes does not handle nonlocal correctly."""
@@ -735,15 +885,11 @@ def bar():
         nonlocal x
         x = 2
 """
-        self.assertEqual(
-            code,
-            autoflake.fix_code(code,
-                               remove_unused_variables=True))
+        self.assertEqual(code, autoflake.fix_code(code, remove_unused_variables=True))
 
     def test_detect_encoding_with_bad_encoding(self):
-        with temporary_file('# -*- coding: blah -*-\n') as filename:
-            self.assertEqual('latin-1',
-                             autoflake.detect_encoding(filename))
+        with temporary_file("# -*- coding: blah -*-\n") as filename:
+            self.assertEqual("latin-1", autoflake.detect_encoding(filename))
 
     def test_fix_code_with_comma_on_right(self):
         """pyflakes does not handle nonlocal correctly."""
@@ -752,11 +898,14 @@ def bar():
 def main():
     pass
 """,
-            autoflake.fix_code("""\
+            autoflake.fix_code(
+                """\
 def main():
     x = (1, 2, 3)
 """,
-                               remove_unused_variables=True))
+                remove_unused_variables=True,
+            ),
+        )
 
     def test_fix_code_with_unused_variables_should_skip_multiple(self):
         code = """\
@@ -764,16 +913,11 @@ def main():
     (x, y, z) = (1, 2, 3)
     print(z)
 """
-        self.assertEqual(
-            code,
-            autoflake.fix_code(code,
-                               remove_unused_variables=True))
+        self.assertEqual(code, autoflake.fix_code(code, remove_unused_variables=True))
 
     def test_fix_code_should_handle_pyflakes_recursion_error_gracefully(self):
-        code = 'x = [{}]'.format('+'.join(['abc' for _ in range(2000)]))
-        self.assertEqual(
-            code,
-            autoflake.fix_code(code))
+        code = "x = [{}]".format("+".join(["abc" for _ in range(2000)]))
+        self.assertEqual(code, autoflake.fix_code(code))
 
     def test_fix_code_with_duplicate_key(self):
         self.assertEqual(
@@ -783,14 +927,20 @@ a = {
 }
 print(a)
 """,
-            ''.join(autoflake.fix_code("""\
+            "".join(
+                autoflake.fix_code(
+                    """\
 a = {
   (0,1): 1,
   (0, 1): 'two',
   (0,1): 3,
 }
 print(a)
-""", remove_duplicate_keys=True)))
+""",
+                    remove_duplicate_keys=True,
+                ),
+            ),
+        )
 
     def test_fix_code_with_duplicate_key_longer(self):
         self.assertEqual(
@@ -804,7 +954,9 @@ print(a)
     'b': 6,
 }
 """,
-            ''.join(autoflake.fix_code("""\
+            "".join(
+                autoflake.fix_code(
+                    """\
 {
     'a': 0,
     'b': 1,
@@ -814,7 +966,11 @@ print(a)
     'f': 5,
     'b': 6,
 }
-""", remove_duplicate_keys=True)))
+""",
+                    remove_duplicate_keys=True,
+                ),
+            ),
+        )
 
     def test_fix_code_with_duplicate_key_with_many_braces(self):
         self.assertEqual(
@@ -828,7 +984,9 @@ a = None
     None: a.b,
 }
 """,
-            ''.join(autoflake.fix_code("""\
+            "".join(
+                autoflake.fix_code(
+                    """\
 a = None
 
 {None: {None: None},
@@ -838,7 +996,11 @@ a = None
     None: a.a,
     None: a.b,
 }
-""", remove_duplicate_keys=True)))
+""",
+                    remove_duplicate_keys=True,
+                ),
+            ),
+        )
 
     def test_fix_code_should_ignore_complex_case_of_duplicate_key(self):
         """We only handle simple cases."""
@@ -851,8 +1013,8 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_fix_code_should_ignore_complex_case_of_duplicate_key_comma(self):
         """We only handle simple cases."""
@@ -867,11 +1029,10 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
-    def test_fix_code_should_ignore_complex_case_of_duplicate_key_partially(
-            self):
+    def test_fix_code_should_ignore_complex_case_of_duplicate_key_partially(self):
         """We only handle simple cases."""
         code = """\
 a = {(0,1): 1, (0, 1): 'two',
@@ -891,8 +1052,8 @@ a = {(0,1): 1, (0, 1): 'two',
 }
 print(a)
 """,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_fix_code_should_ignore_more_cases_of_duplicate_key(self):
         """We only handle simple cases."""
@@ -908,8 +1069,8 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_fix_code_should_ignore_duplicate_key_with_comments(self):
         """We only handle simple cases."""
@@ -926,8 +1087,8 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
         code = """\
 {
@@ -941,8 +1102,8 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_fix_code_should_ignore_duplicate_key_with_multiline_key(self):
         """We only handle simple cases."""
@@ -958,8 +1119,8 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_fix_code_should_ignore_duplicate_key_with_no_comma(self):
         """We don't want to delete the line and leave a lone comma."""
@@ -975,38 +1136,39 @@ print(a)
 
         self.assertEqual(
             code,
-            ''.join(autoflake.fix_code(code,
-                                       remove_duplicate_keys=True)))
+            "".join(autoflake.fix_code(code, remove_duplicate_keys=True)),
+        )
 
     def test_useless_pass_line_numbers(self):
-        self.assertEqual(
-            [1],
-            list(autoflake.useless_pass_line_numbers(
-                'pass\n')))
+        self.assertEqual([1], list(autoflake.useless_pass_line_numbers("pass\n")))
 
         self.assertEqual(
             [],
-            list(autoflake.useless_pass_line_numbers(
-                'if True:\n    pass\n')))
+            list(autoflake.useless_pass_line_numbers("if True:\n    pass\n")),
+        )
 
     def test_useless_pass_line_numbers_with_escaped_newline(self):
         self.assertEqual(
             [],
-            list(autoflake.useless_pass_line_numbers(
-                'if True:\\\n    pass\n')))
+            list(autoflake.useless_pass_line_numbers("if True:\\\n    pass\n")),
+        )
 
     def test_useless_pass_line_numbers_with_more_complex(self):
         self.assertEqual(
             [6],
-            list(autoflake.useless_pass_line_numbers(
-                """\
+            list(
+                autoflake.useless_pass_line_numbers(
+                    """\
 if True:
     pass
 else:
     True
     x = 1
     pass
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass(self):
         self.assertEqual(
@@ -1017,15 +1179,19 @@ else:
     True
     x = 1
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 if True:
     pass
 else:
     True
     x = 1
     pass
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass_with_syntax_error(self):
         source = """\
@@ -1043,9 +1209,7 @@ else:
     x = 1
 """
 
-        self.assertEqual(
-            source,
-            ''.join(autoflake.filter_useless_pass(source)))
+        self.assertEqual(source, "".join(autoflake.filter_useless_pass(source)))
 
     def test_filter_useless_pass_more_complex(self):
         self.assertEqual(
@@ -1065,8 +1229,9 @@ else:
     True
     x = 1
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 if True:
     pass
 else:
@@ -1084,7 +1249,10 @@ else:
     True
     x = 1
     pass
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass_with_try(self):
         self.assertEqual(
@@ -1096,8 +1264,9 @@ try:
 except ImportError:
     pass
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 import os
 os.foo()
 try:
@@ -1105,7 +1274,10 @@ try:
     pass
 except ImportError:
     pass
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass_leading_pass(self):
         self.assertEqual(
@@ -1116,8 +1288,9 @@ else:
     True
     x = 1
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 if True:
     pass
     pass
@@ -1128,7 +1301,10 @@ else:
     True
     x = 1
     pass
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass_leading_pass_with_number(self):
         self.assertEqual(
@@ -1137,13 +1313,17 @@ def func11():
     0, 11 / 2
     return 1
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 def func11():
     pass
     0, 11 / 2
     return 1
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_filter_useless_pass_leading_pass_with_string(self):
         self.assertEqual(
@@ -1152,24 +1332,28 @@ def func11():
     'hello'
     return 1
 """,
-            ''.join(autoflake.filter_useless_pass(
-                """\
+            "".join(
+                autoflake.filter_useless_pass(
+                    """\
 def func11():
     pass
     'hello'
     return 1
-""")))
+""",
+                ),
+            ),
+        )
 
     def test_check(self):
-        self.assertTrue(autoflake.check('import os'))
+        self.assertTrue(autoflake.check("import os"))
 
     def test_check_with_bad_syntax(self):
-        self.assertFalse(autoflake.check('foo('))
+        self.assertFalse(autoflake.check("foo("))
 
     def test_check_with_unicode(self):
         self.assertFalse(autoflake.check('print("∑")'))
 
-        self.assertTrue(autoflake.check('import os  # ∑'))
+        self.assertTrue(autoflake.check("import os  # ∑"))
 
     def test_get_diff_text(self):
         # We ignore the first two lines since it differs on Python 2.6.
@@ -1178,9 +1362,10 @@ def func11():
 -foo
 +bar
 """,
-            '\n'.join(autoflake.get_diff_text(['foo\n'],
-                                              ['bar\n'],
-                                              '').split('\n')[3:]))
+            "\n".join(
+                autoflake.get_diff_text(["foo\n"], ["bar\n"], "").split("\n")[3:],
+            ),
+        )
 
     def test_get_diff_text_without_newline(self):
         # We ignore the first two lines since it differs on Python 2.6.
@@ -1190,85 +1375,82 @@ def func11():
 \\ No newline at end of file
 +foo
 """,
-            '\n'.join(autoflake.get_diff_text(['foo'],
-                                              ['foo\n'],
-                                              '').split('\n')[3:]))
+            "\n".join(autoflake.get_diff_text(["foo"], ["foo\n"], "").split("\n")[3:]),
+        )
 
     def test_is_literal_or_name(self):
-        self.assertTrue(autoflake.is_literal_or_name('123'))
-        self.assertTrue(autoflake.is_literal_or_name('[1, 2, 3]'))
-        self.assertTrue(autoflake.is_literal_or_name('xyz'))
+        self.assertTrue(autoflake.is_literal_or_name("123"))
+        self.assertTrue(autoflake.is_literal_or_name("[1, 2, 3]"))
+        self.assertTrue(autoflake.is_literal_or_name("xyz"))
 
-        self.assertFalse(autoflake.is_literal_or_name('xyz.prop'))
-        self.assertFalse(autoflake.is_literal_or_name(' '))
-        self.assertFalse(autoflake.is_literal_or_name(' 1'))
+        self.assertFalse(autoflake.is_literal_or_name("xyz.prop"))
+        self.assertFalse(autoflake.is_literal_or_name(" "))
+        self.assertFalse(autoflake.is_literal_or_name(" 1"))
 
     def test_is_python_file(self):
-        self.assertTrue(autoflake.is_python_file(
-            os.path.join(ROOT_DIRECTORY, 'autoflake.py')))
+        self.assertTrue(
+            autoflake.is_python_file(os.path.join(ROOT_DIRECTORY, "autoflake.py")),
+        )
 
-        with temporary_file('#!/usr/bin/env python', suffix='') as filename:
+        with temporary_file("#!/usr/bin/env python", suffix="") as filename:
             self.assertTrue(autoflake.is_python_file(filename))
 
-        with temporary_file('#!/usr/bin/python', suffix='') as filename:
+        with temporary_file("#!/usr/bin/python", suffix="") as filename:
             self.assertTrue(autoflake.is_python_file(filename))
 
-        with temporary_file('#!/usr/bin/python3', suffix='') as filename:
+        with temporary_file("#!/usr/bin/python3", suffix="") as filename:
             self.assertTrue(autoflake.is_python_file(filename))
 
-        with temporary_file('#!/usr/bin/pythonic', suffix='') as filename:
+        with temporary_file("#!/usr/bin/pythonic", suffix="") as filename:
             self.assertFalse(autoflake.is_python_file(filename))
 
-        with temporary_file('###!/usr/bin/python', suffix='') as filename:
+        with temporary_file("###!/usr/bin/python", suffix="") as filename:
             self.assertFalse(autoflake.is_python_file(filename))
 
         self.assertFalse(autoflake.is_python_file(os.devnull))
-        self.assertFalse(autoflake.is_python_file('/bin/bash'))
+        self.assertFalse(autoflake.is_python_file("/bin/bash"))
 
     def test_is_exclude_file(self):
-        self.assertTrue(autoflake.is_exclude_file(
-            "1.py", ["test*", "1*"]))
+        self.assertTrue(autoflake.is_exclude_file("1.py", ["test*", "1*"]))
 
-        self.assertFalse(autoflake.is_exclude_file(
-            "2.py", ["test*", "1*"]))
+        self.assertFalse(autoflake.is_exclude_file("2.py", ["test*", "1*"]))
 
         # folder glob
-        self.assertTrue(autoflake.is_exclude_file(
-            "test/test.py", ["test/**.py"]))
+        self.assertTrue(autoflake.is_exclude_file("test/test.py", ["test/**.py"]))
 
-        self.assertTrue(autoflake.is_exclude_file(
-            "test/auto_test.py", ["test/*_test.py"]))
+        self.assertTrue(
+            autoflake.is_exclude_file("test/auto_test.py", ["test/*_test.py"]),
+        )
 
-        self.assertFalse(autoflake.is_exclude_file(
-            "test/auto_auto.py", ["test/*_test.py"]))
+        self.assertFalse(
+            autoflake.is_exclude_file("test/auto_auto.py", ["test/*_test.py"]),
+        )
 
     def test_match_file(self):
-        with temporary_file('', suffix='.py', prefix='.') as filename:
-            self.assertFalse(autoflake.match_file(filename, exclude=[]),
-                             msg=filename)
+        with temporary_file("", suffix=".py", prefix=".") as filename:
+            self.assertFalse(autoflake.match_file(filename, exclude=[]), msg=filename)
 
         self.assertFalse(autoflake.match_file(os.devnull, exclude=[]))
 
-        with temporary_file('', suffix='.py', prefix='') as filename:
-            self.assertTrue(autoflake.match_file(filename, exclude=[]),
-                            msg=filename)
+        with temporary_file("", suffix=".py", prefix="") as filename:
+            self.assertTrue(autoflake.match_file(filename, exclude=[]), msg=filename)
 
     def test_find_files(self):
         temp_directory = tempfile.mkdtemp()
         try:
-            target = os.path.join(temp_directory, 'dir')
+            target = os.path.join(temp_directory, "dir")
             os.mkdir(target)
-            with open(os.path.join(target, 'a.py'), 'w'):
+            with open(os.path.join(target, "a.py"), "w"):
                 pass
 
-            exclude = os.path.join(target, 'ex')
+            exclude = os.path.join(target, "ex")
             os.mkdir(exclude)
-            with open(os.path.join(exclude, 'b.py'), 'w'):
+            with open(os.path.join(exclude, "b.py"), "w"):
                 pass
 
-            sub = os.path.join(exclude, 'sub')
+            sub = os.path.join(exclude, "sub")
             os.mkdir(sub)
-            with open(os.path.join(sub, 'c.py'), 'w'):
+            with open(os.path.join(sub, "c.py"), "w"):
                 pass
 
             # FIXME: Avoid changing directory. This may interfere with parallel
@@ -1276,37 +1458,38 @@ def func11():
             cwd = os.getcwd()
             os.chdir(temp_directory)
             try:
-                files = list(autoflake.find_files(
-                    ['dir'], True, [os.path.join('dir', 'ex')]))
+                files = list(
+                    autoflake.find_files(["dir"], True, [os.path.join("dir", "ex")]),
+                )
             finally:
                 os.chdir(cwd)
 
             file_names = [os.path.basename(f) for f in files]
-            self.assertIn('a.py', file_names)
-            self.assertNotIn('b.py', file_names)
-            self.assertNotIn('c.py', file_names)
+            self.assertIn("a.py", file_names)
+            self.assertNotIn("b.py", file_names)
+            self.assertNotIn("c.py", file_names)
         finally:
             shutil.rmtree(temp_directory)
 
     def test_exclude(self):
-        temp_directory = tempfile.mkdtemp(dir='.')
+        temp_directory = tempfile.mkdtemp(dir=".")
         try:
-            with open(os.path.join(temp_directory, 'a.py'), 'w') as output:
-                output.write('import re\n')
+            with open(os.path.join(temp_directory, "a.py"), "w") as output:
+                output.write("import re\n")
 
-            os.mkdir(os.path.join(temp_directory, 'd'))
-            with open(os.path.join(temp_directory, 'd', 'b.py'),
-                      'w') as output:
-                output.write('import os\n')
+            os.mkdir(os.path.join(temp_directory, "d"))
+            with open(os.path.join(temp_directory, "d", "b.py"), "w") as output:
+                output.write("import os\n")
 
             p = subprocess.Popen(
-                list(AUTOFLAKE_COMMAND) +
-                [temp_directory, '--recursive', '--exclude=a*'],
-                stdout=subprocess.PIPE)
-            result = p.communicate()[0].decode('utf-8')
+                list(AUTOFLAKE_COMMAND)
+                + [temp_directory, "--recursive", "--exclude=a*"],
+                stdout=subprocess.PIPE,
+            )
+            result = p.communicate()[0].decode("utf-8")
 
-            self.assertNotIn('import re', result)
-            self.assertIn('import os', result)
+            self.assertNotIn("import re", result)
+            self.assertIn("import os", result)
         finally:
             shutil.rmtree(temp_directory)
 
@@ -1316,52 +1499,69 @@ class SystemTests(unittest.TestCase):
     """System tests."""
 
     def test_diff(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import re
 import os
 import my_own_module
 x = 1
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', filename],
-                            standard_out=output_file,
-                            standard_error=None)
-            self.assertEqual("""\
+            autoflake._main(
+                argv=["my_fake_program", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
+            self.assertEqual(
+                """\
 -import re
 -import os
  import my_own_module
  x = 1
-""", '\n'.join(output_file.getvalue().split('\n')[3:]))
+""",
+                "\n".join(output_file.getvalue().split("\n")[3:]),
+            )
 
     def test_diff_with_nonexistent_file(self):
         output_file = io.StringIO()
-        autoflake._main(argv=['my_fake_program', 'nonexistent_file'],
-                        standard_out=output_file,
-                        standard_error=output_file)
-        self.assertIn('no such file', output_file.getvalue().lower())
+        autoflake._main(
+            argv=["my_fake_program", "nonexistent_file"],
+            standard_out=output_file,
+            standard_error=output_file,
+        )
+        self.assertIn("no such file", output_file.getvalue().lower())
 
     def test_diff_with_encoding_declaration(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 # coding: iso-8859-1
 import re
 import os
 import my_own_module
 x = 1
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', filename],
-                            standard_out=output_file,
-                            standard_error=None)
-            self.assertEqual("""\
+            autoflake._main(
+                argv=["my_fake_program", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
+            self.assertEqual(
+                """\
  # coding: iso-8859-1
 -import re
 -import os
  import my_own_module
  x = 1
-""", '\n'.join(output_file.getvalue().split('\n')[3:]))
+""",
+                "\n".join(output_file.getvalue().split("\n")[3:]),
+            )
 
     def test_in_place(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import foo
 x = foo
 import subprocess
@@ -1371,13 +1571,17 @@ try:
     import os
 except ImportError:
     import os
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', '--in-place', filename],
-                            standard_out=output_file,
-                            standard_error=None)
+            autoflake._main(
+                argv=["my_fake_program", "--in-place", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
             with open(filename) as f:
-                self.assertEqual("""\
+                self.assertEqual(
+                    """\
 import foo
 x = foo
 x()
@@ -1386,32 +1590,41 @@ try:
     pass
 except ImportError:
     pass
-""", f.read())
+""",
+                    f.read(),
+                )
 
     def test_check_with_empty_file(self):
-        line = ''
+        line = ""
 
         with temporary_file(line) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', '--check', filename],
-                            standard_out=output_file,
-                            standard_error=None)
-            self.assertEqual('No issues detected!\n', output_file.getvalue())
+            autoflake._main(
+                argv=["my_fake_program", "--check", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
+            self.assertEqual("No issues detected!\n", output_file.getvalue())
 
     def test_check_correct_file(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import foo
 x = foo.bar
 print(x)
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', '--check', filename],
-                            standard_out=output_file,
-                            standard_error=None)
-            self.assertEqual('No issues detected!\n', output_file.getvalue())
+            autoflake._main(
+                argv=["my_fake_program", "--check", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
+            self.assertEqual("No issues detected!\n", output_file.getvalue())
 
     def test_check_useless_pass(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import foo
 x = foo
 import subprocess
@@ -1424,29 +1637,37 @@ except ImportError:
     pass
     import os
     import sys
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
             with self.assertRaises(SystemExit) as cm:
-                autoflake._main(argv=['my_fake_program', '--check', filename],
-                                standard_out=output_file,
-                                standard_error=None)
+                autoflake._main(
+                    argv=["my_fake_program", "--check", filename],
+                    standard_out=output_file,
+                    standard_error=None,
+                )
                 self.assertEqual(cm.exception.code, 1)
-                self.assertEqual('Unused imports/variables detected.',
-                                 output_file.getvalue())
+                self.assertEqual(
+                    "Unused imports/variables detected.",
+                    output_file.getvalue(),
+                )
 
     def test_in_place_with_empty_file(self):
-        line = ''
+        line = ""
 
         with temporary_file(line) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', '--in-place', filename],
-                            standard_out=output_file,
-                            standard_error=None)
+            autoflake._main(
+                argv=["my_fake_program", "--in-place", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
             with open(filename) as f:
                 self.assertEqual(line, f.read())
 
     def test_in_place_with_with_useless_pass(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import foo
 x = foo
 import subprocess
@@ -1459,13 +1680,17 @@ except ImportError:
     pass
     import os
     import sys
-""") as filename:
+""",
+        ) as filename:
             output_file = io.StringIO()
-            autoflake._main(argv=['my_fake_program', '--in-place', filename],
-                            standard_out=output_file,
-                            standard_error=None)
+            autoflake._main(
+                argv=["my_fake_program", "--in-place", filename],
+                standard_out=output_file,
+                standard_error=None,
+            )
             with open(filename) as f:
-                self.assertEqual("""\
+                self.assertEqual(
+                    """\
 import foo
 x = foo
 x()
@@ -1474,67 +1699,78 @@ try:
     pass
 except ImportError:
     pass
-""", f.read())
+""",
+                    f.read(),
+                )
 
     def test_with_missing_file(self):
         output_file = io.StringIO()
         ignore = StubFile()
-        autoflake._main(argv=['my_fake_program', '--in-place', '.fake'],
-                        standard_out=output_file,
-                        standard_error=ignore)
+        autoflake._main(
+            argv=["my_fake_program", "--in-place", ".fake"],
+            standard_out=output_file,
+            standard_error=ignore,
+        )
         self.assertFalse(output_file.getvalue())
 
     def test_ignore_hidden_directories(self):
         with temporary_directory() as directory:
-            with temporary_directory(prefix='.',
-                                     directory=directory) as inner_directory:
+            with temporary_directory(
+                prefix=".",
+                directory=directory,
+            ) as inner_directory:
 
-                with temporary_file("""\
+                with temporary_file(
+                    """\
 import re
 import os
-""", directory=inner_directory):
+""",
+                    directory=inner_directory,
+                ):
 
                     output_file = io.StringIO()
-                    autoflake._main(argv=['my_fake_program',
-                                          '--recursive',
-                                          directory],
-                                    standard_out=output_file,
-                                    standard_error=None)
-                    self.assertEqual(
-                        '',
-                        output_file.getvalue().strip())
+                    autoflake._main(
+                        argv=["my_fake_program", "--recursive", directory],
+                        standard_out=output_file,
+                        standard_error=None,
+                    )
+                    self.assertEqual("", output_file.getvalue().strip())
 
     def test_redundant_options(self):
         output_file = io.StringIO()
-        autoflake._main(argv=['my_fake_program',
-                              '--remove-all', '--imports=blah', __file__],
-                        standard_out=output_file,
-                        standard_error=output_file)
+        autoflake._main(
+            argv=["my_fake_program", "--remove-all", "--imports=blah", __file__],
+            standard_out=output_file,
+            standard_error=output_file,
+        )
 
-        self.assertIn('redundant', output_file.getvalue())
+        self.assertIn("redundant", output_file.getvalue())
 
     def test_in_place_and_stdout(self):
         output_file = io.StringIO()
         self.assertRaises(
             SystemExit,
             autoflake._main,
-            argv=['my_fake_program', '--in-place', '--stdout', __file__],
+            argv=["my_fake_program", "--in-place", "--stdout", __file__],
             standard_out=output_file,
             standard_error=output_file,
         )
 
     def test_end_to_end(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import fake_fake, fake_foo, fake_bar, fake_zoo
 import re, os
 x = os.sep
 print(x)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--imports=fake_foo,fake_bar',
-                                        filename],
-                                       stdout=subprocess.PIPE)
-            self.assertEqual("""\
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND + ["--imports=fake_foo,fake_bar", filename],
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                """\
 -import fake_fake, fake_foo, fake_bar, fake_zoo
 -import re, os
 +import fake_fake
@@ -1542,29 +1778,37 @@ print(x)
 +import os
  x = os.sep
  print(x)
-""", '\n'.join(process.communicate()[0].decode().split('\n')[3:]))
+""",
+                "\n".join(process.communicate()[0].decode().split("\n")[3:]),
+            )
 
     def test_end_to_end_with_remove_all_unused_imports(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import fake_fake, fake_foo, fake_bar, fake_zoo
 import re, os
 x = os.sep
 print(x)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--remove-all',
-                                        filename],
-                                       stdout=subprocess.PIPE)
-            self.assertEqual("""\
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND + ["--remove-all", filename],
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                """\
 -import fake_fake, fake_foo, fake_bar, fake_zoo
 -import re, os
 +import os
  x = os.sep
  print(x)
-""", '\n'.join(process.communicate()[0].decode().split('\n')[3:]))
+""",
+                "\n".join(process.communicate()[0].decode().split("\n")[3:]),
+            )
 
     def test_end_to_end_with_remove_duplicate_keys_multiple_lines(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 a = {
     'b': 456,
     'a': 123,
@@ -1576,12 +1820,14 @@ a = {
     'b': 'hiya',
 }
 print(a)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--remove-duplicate-keys',
-                                        filename],
-                                       stdout=subprocess.PIPE)
-            self.assertEqual("""\
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND + ["--remove-duplicate-keys", filename],
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                """\
  a = {
 -    'b': 456,
 -    'a': 123,
@@ -1592,10 +1838,13 @@ print(a)
      'c': 'hello2',
      'b': 'hiya',
  }
-""", '\n'.join(process.communicate()[0].decode().split('\n')[3:]))
+""",
+                "\n".join(process.communicate()[0].decode().split("\n")[3:]),
+            )
 
     def test_end_to_end_with_remove_duplicate_keys_and_other_errors(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 from math import *
 print(sin(4))
 a = { # Hello
@@ -1609,12 +1858,14 @@ a = { # Hello
     'b': 'hiya',
 }
 print(a)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--remove-duplicate-keys',
-                                        filename],
-                                       stdout=subprocess.PIPE)
-            self.assertEqual("""\
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND + ["--remove-duplicate-keys", filename],
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                """\
  from math import *
  print(sin(4))
  a = { # Hello
@@ -1627,45 +1878,52 @@ print(a)
      'c': 'hello2',
      'b': 'hiya',
  }
-""", '\n'.join(process.communicate()[0].decode().split('\n')[3:]))
+""",
+                "\n".join(process.communicate()[0].decode().split("\n")[3:]),
+            )
 
     def test_end_to_end_with_remove_duplicate_keys_tuple(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 a = {
   (0,1): 1,
   (0, 1): 'two',
   (0,1): 3,
 }
 print(a)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--remove-duplicate-keys',
-                                        filename],
-                                       stdout=subprocess.PIPE)
-            self.assertEqual("""\
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND + ["--remove-duplicate-keys", filename],
+                stdout=subprocess.PIPE,
+            )
+            self.assertEqual(
+                """\
  a = {
 -  (0,1): 1,
 -  (0, 1): 'two',
    (0,1): 3,
  }
  print(a)
-""", '\n'.join(process.communicate()[0].decode().split('\n')[3:]))
+""",
+                "\n".join(process.communicate()[0].decode().split("\n")[3:]),
+            )
 
     def test_end_to_end_with_error(self):
-        with temporary_file("""\
+        with temporary_file(
+            """\
 import fake_fake, fake_foo, fake_bar, fake_zoo
 import re, os
 x = os.sep
 print(x)
-""") as filename:
-            process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                       ['--imports=fake_foo,fake_bar',
-                                        '--remove-all',
-                                        filename],
-                                       stderr=subprocess.PIPE)
-            self.assertIn(
-                'redundant',
-                process.communicate()[1].decode())
+""",
+        ) as filename:
+            process = subprocess.Popen(
+                AUTOFLAKE_COMMAND
+                + ["--imports=fake_foo,fake_bar", "--remove-all", filename],
+                stderr=subprocess.PIPE,
+            )
+            self.assertIn("redundant", process.communicate()[1].decode())
 
     def test_end_to_end_from_stdin(self):
         stdin_data = b"""\
@@ -1674,16 +1932,20 @@ import re, os
 x = os.sep
 print(x)
 """
-        process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                   ['--remove-all', '-'],
-                                   stdout=subprocess.PIPE,
-                                   stdin=subprocess.PIPE)
+        process = subprocess.Popen(
+            AUTOFLAKE_COMMAND + ["--remove-all", "-"],
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+        )
         stdout, _ = process.communicate(stdin_data)
-        self.assertEqual("""\
+        self.assertEqual(
+            """\
 import os
 x = os.sep
 print(x)
-""", stdout.decode())
+""",
+            stdout.decode(),
+        )
 
     def test_end_to_end_from_stdin_with_in_place(self):
         stdin_data = b"""\
@@ -1692,42 +1954,45 @@ import re, os, sys
 x = os.sep
 print(x)
 """
-        process = subprocess.Popen(AUTOFLAKE_COMMAND +
-                                   ['--remove-all', '--in-place', '-'],
-                                   stdout=subprocess.PIPE,
-                                   stdin=subprocess.PIPE)
+        process = subprocess.Popen(
+            AUTOFLAKE_COMMAND + ["--remove-all", "--in-place", "-"],
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+        )
         stdout, _ = process.communicate(stdin_data)
-        self.assertEqual("""\
+        self.assertEqual(
+            """\
 import os
 x = os.sep
 print(x)
-""", stdout.decode())
+""",
+            stdout.decode(),
+        )
 
 
 class MultilineFromImportTests(unittest.TestCase):
     def test_is_over(self):
-        filt = autoflake.FilterMultilineImport('from . import (\n')
-        self.assertTrue(filt.is_over('module)\n'))
-        self.assertTrue(filt.is_over('  )\n'))
-        self.assertTrue(filt.is_over('  )  # comment\n'))
-        self.assertTrue(filt.is_over('from module import (a, b)\n'))
-        self.assertFalse(filt.is_over('#  )'))
-        self.assertFalse(filt.is_over('module\n'))
-        self.assertFalse(filt.is_over('module, \\\n'))
-        self.assertFalse(filt.is_over('\n'))
+        filt = autoflake.FilterMultilineImport("from . import (\n")
+        self.assertTrue(filt.is_over("module)\n"))
+        self.assertTrue(filt.is_over("  )\n"))
+        self.assertTrue(filt.is_over("  )  # comment\n"))
+        self.assertTrue(filt.is_over("from module import (a, b)\n"))
+        self.assertFalse(filt.is_over("#  )"))
+        self.assertFalse(filt.is_over("module\n"))
+        self.assertFalse(filt.is_over("module, \\\n"))
+        self.assertFalse(filt.is_over("\n"))
 
-        filt = autoflake.FilterMultilineImport('from . import module, \\\n')
-        self.assertTrue(filt.is_over('module\n'))
-        self.assertTrue(filt.is_over('\n'))
-        self.assertTrue(filt.is_over('m1, m2  # comment with \\\n'))
-        self.assertFalse(filt.is_over('m1, m2 \\\n'))
-        self.assertFalse(filt.is_over('m1, m2 \\  #\n'))
-        self.assertFalse(filt.is_over('m1, m2 \\  # comment with \\\n'))
-        self.assertFalse(filt.is_over('\\\n'))
+        filt = autoflake.FilterMultilineImport("from . import module, \\\n")
+        self.assertTrue(filt.is_over("module\n"))
+        self.assertTrue(filt.is_over("\n"))
+        self.assertTrue(filt.is_over("m1, m2  # comment with \\\n"))
+        self.assertFalse(filt.is_over("m1, m2 \\\n"))
+        self.assertFalse(filt.is_over("m1, m2 \\  #\n"))
+        self.assertFalse(filt.is_over("m1, m2 \\  # comment with \\\n"))
+        self.assertFalse(filt.is_over("\\\n"))
 
         # "Multiline" imports that are not really multiline
-        filt = autoflake.FilterMultilineImport('import os; '
-                                               'import math, subprocess')
+        filt = autoflake.FilterMultilineImport("import os; " "import math, subprocess")
         self.assertTrue(filt.is_over())
 
     unused = ()
@@ -1736,446 +2001,420 @@ class MultilineFromImportTests(unittest.TestCase):
         fixer = autoflake.FilterMultilineImport(
             lines[0],
             remove_all_unused_imports=remove_all,
-            unused_module=self.unused
+            unused_module=self.unused,
         )
         fixed = functools.reduce(lambda acc, x: acc(x), lines[1:], fixer())
         self.assertEqual(fixed, result)
 
     def test_fix(self):
-        self.unused = ['third_party.lib' + str(x) for x in (1, 3, 4)]
+        self.unused = ["third_party.lib" + str(x) for x in (1, 3, 4)]
 
         # Example m0 (isort)
-        self.assert_fix([
-            'from third_party import (lib1, lib2, lib3,\n',
-            '                         lib4, lib5, lib6)\n'
-        ],
-            'from third_party import (lib2, lib5, lib6)\n'
+        self.assert_fix(
+            [
+                "from third_party import (lib1, lib2, lib3,\n",
+                "                         lib4, lib5, lib6)\n",
+            ],
+            "from third_party import (lib2, lib5, lib6)\n",
         )
 
         # Example m1(isort)
-        self.assert_fix([
-            'from third_party import (lib1,\n',
-            '                         lib2,\n',
-            '                         lib3,\n',
-            '                         lib4,\n',
-            '                         lib5,\n',
-            '                         lib6)\n'
-        ],
-            'from third_party import (lib2,\n'
-            '                         lib5,\n'
-            '                         lib6)\n'
+        self.assert_fix(
+            [
+                "from third_party import (lib1,\n",
+                "                         lib2,\n",
+                "                         lib3,\n",
+                "                         lib4,\n",
+                "                         lib5,\n",
+                "                         lib6)\n",
+            ],
+            "from third_party import (lib2,\n"
+            "                         lib5,\n"
+            "                         lib6)\n",
         )
 
         # Variation m1(isort)
-        self.assert_fix([
-            'from third_party import (lib1\n',
-            '                        ,lib2\n',
-            '                        ,lib3\n',
-            '                        ,lib4\n',
-            '                        ,lib5\n',
-            '                        ,lib6)\n'
-        ],
-            'from third_party import (lib2\n'
-            '                        ,lib5\n'
-            '                        ,lib6)\n'
+        self.assert_fix(
+            [
+                "from third_party import (lib1\n",
+                "                        ,lib2\n",
+                "                        ,lib3\n",
+                "                        ,lib4\n",
+                "                        ,lib5\n",
+                "                        ,lib6)\n",
+            ],
+            "from third_party import (lib2\n"
+            "                        ,lib5\n"
+            "                        ,lib6)\n",
         )
 
         # Example m2 (isort)
-        self.assert_fix([
-            'from third_party import \\\n',
-            '    lib1, lib2, lib3, \\\n',
-            '    lib4, lib5, lib6\n'
-        ],
-            'from third_party import \\\n'
-            '    lib2, lib5, lib6\n'
+        self.assert_fix(
+            [
+                "from third_party import \\\n",
+                "    lib1, lib2, lib3, \\\n",
+                "    lib4, lib5, lib6\n",
+            ],
+            "from third_party import \\\n" "    lib2, lib5, lib6\n",
         )
 
         # Example m3 (isort)
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1,\n',
-            '    lib2,\n',
-            '    lib3,\n',
-            '    lib4,\n',
-            '    lib5\n',
-            ')\n'
-        ],
-            'from third_party import (\n'
-            '    lib2,\n'
-            '    lib5\n'
-            ')\n'
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1,\n",
+                "    lib2,\n",
+                "    lib3,\n",
+                "    lib4,\n",
+                "    lib5\n",
+                ")\n",
+            ],
+            "from third_party import (\n" "    lib2,\n" "    lib5\n" ")\n",
         )
 
         # Example m4 (isort)
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1, lib2, lib3, lib4,\n',
-            '    lib5, lib6)\n'
-        ],
-            'from third_party import (\n'
-            '    lib2, lib5, lib6)\n'
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1, lib2, lib3, lib4,\n",
+                "    lib5, lib6)\n",
+            ],
+            "from third_party import (\n" "    lib2, lib5, lib6)\n",
         )
 
         # Example m5 (isort)
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1, lib2, lib3, lib4,\n',
-            '    lib5, lib6\n',
-            ')\n'
-        ],
-            'from third_party import (\n'
-            '    lib2, lib5, lib6\n'
-            ')\n'
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1, lib2, lib3, lib4,\n",
+                "    lib5, lib6\n",
+                ")\n",
+            ],
+            "from third_party import (\n" "    lib2, lib5, lib6\n" ")\n",
         )
 
         # Some Deviations
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1\\\n',  # only unused + line continuation
-            '    ,lib2, \n',
-            '    libA\n',  # used import with no commas
-            '    ,lib3, \n',  # leading and trailing commas with unused import
-            '    libB, \n',
-            '    \\\n',  # empty line with continuation
-            '    lib4,\n',  # unused import with comment
-            ')\n'
-        ],
-            'from third_party import (\n'
-            '    lib2\\\n'
-            '    ,libA, \n'
-            '    libB,\n'
-            ')\n',
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1\\\n",  # only unused + line continuation
+                "    ,lib2, \n",
+                "    libA\n",  # used import with no commas
+                "    ,lib3, \n",  # leading and trailing commas with unused import
+                "    libB, \n",
+                "    \\\n",  # empty line with continuation
+                "    lib4,\n",  # unused import with comment
+                ")\n",
+            ],
+            "from third_party import (\n"
+            "    lib2\\\n"
+            "    ,libA, \n"
+            "    libB,\n"
+            ")\n",
         )
 
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1\n',
-            ',\n',
-            '    lib2\n',
-            ',\n',
-            '    lib3\n',
-            ',\n',
-            '    lib4\n',
-            ',\n',
-            '    lib5\n',
-            ')\n'
-        ],
-            'from third_party import (\n'
-            '    lib2\n'
-            ',\n'
-            '    lib5\n'
-            ')\n'
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1\n",
+                ",\n",
+                "    lib2\n",
+                ",\n",
+                "    lib3\n",
+                ",\n",
+                "    lib4\n",
+                ",\n",
+                "    lib5\n",
+                ")\n",
+            ],
+            "from third_party import (\n" "    lib2\n" ",\n" "    lib5\n" ")\n",
         )
 
-        self.assert_fix([
-            'from third_party import (\n',
-            '    lib1 \\\n',
-            ', \\\n',
-            '    lib2 \\\n',
-            ',\\\n',
-            '    lib3\n',
-            ',\n',
-            '    lib4\n',
-            ',\n',
-            '    lib5 \\\n',
-            ')\n'
-        ],
-            'from third_party import (\n'
-            '    lib2 \\\n'
-            ', \\\n'
-            '    lib5 \\\n'
-            ')\n'
+        self.assert_fix(
+            [
+                "from third_party import (\n",
+                "    lib1 \\\n",
+                ", \\\n",
+                "    lib2 \\\n",
+                ",\\\n",
+                "    lib3\n",
+                ",\n",
+                "    lib4\n",
+                ",\n",
+                "    lib5 \\\n",
+                ")\n",
+            ],
+            "from third_party import (\n"
+            "    lib2 \\\n"
+            ", \\\n"
+            "    lib5 \\\n"
+            ")\n",
         )
 
     def test_indentation(self):
         # Some weird indentation examples
-        self.unused = ['third_party.lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            '    from third_party import (\n',
-            '            lib1, lib2, lib3, lib4,\n',
-            '    lib5, lib6\n',
-            ')\n'
-        ],
-            '    from third_party import (\n'
-            '            lib2, lib5, lib6\n'
-            ')\n'
+        self.unused = ["third_party.lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "    from third_party import (\n",
+                "            lib1, lib2, lib3, lib4,\n",
+                "    lib5, lib6\n",
+                ")\n",
+            ],
+            "    from third_party import (\n" "            lib2, lib5, lib6\n" ")\n",
         )
-        self.assert_fix([
-            '\tfrom third_party import \\\n',
-            '\t\tlib1, lib2, lib3, \\\n',
-            '\t\tlib4, lib5, lib6\n'
-        ],
-            '\tfrom third_party import \\\n'
-            '\t\tlib2, lib5, lib6\n'
+        self.assert_fix(
+            [
+                "\tfrom third_party import \\\n",
+                "\t\tlib1, lib2, lib3, \\\n",
+                "\t\tlib4, lib5, lib6\n",
+            ],
+            "\tfrom third_party import \\\n" "\t\tlib2, lib5, lib6\n",
         )
 
     def test_fix_relative(self):
         # Example m0 (isort)
-        self.unused = ['.lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'from . import (lib1, lib2, lib3,\n',
-            '               lib4, lib5, lib6)\n'
-        ],
-            'from . import (lib2, lib5, lib6)\n'
+        self.unused = [".lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "from . import (lib1, lib2, lib3,\n",
+                "               lib4, lib5, lib6)\n",
+            ],
+            "from . import (lib2, lib5, lib6)\n",
         )
 
         # Example m1(isort)
-        self.unused = ['..lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'from .. import (lib1,\n',
-            '                lib2,\n',
-            '                lib3,\n',
-            '                lib4,\n',
-            '                lib5,\n',
-            '                lib6)\n'
-        ],
-            'from .. import (lib2,\n'
-            '                lib5,\n'
-            '                lib6)\n'
+        self.unused = ["..lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "from .. import (lib1,\n",
+                "                lib2,\n",
+                "                lib3,\n",
+                "                lib4,\n",
+                "                lib5,\n",
+                "                lib6)\n",
+            ],
+            "from .. import (lib2,\n"
+            "                lib5,\n"
+            "                lib6)\n",
         )
 
         # Example m2 (isort)
-        self.unused = ['...lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'from ... import \\\n',
-            '    lib1, lib2, lib3, \\\n',
-            '    lib4, lib5, lib6\n'
-        ],
-            'from ... import \\\n'
-            '    lib2, lib5, lib6\n'
+        self.unused = ["...lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "from ... import \\\n",
+                "    lib1, lib2, lib3, \\\n",
+                "    lib4, lib5, lib6\n",
+            ],
+            "from ... import \\\n" "    lib2, lib5, lib6\n",
         )
 
         # Example m3 (isort)
-        self.unused = ['.parent.lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'from .parent import (\n',
-            '    lib1,\n',
-            '    lib2,\n',
-            '    lib3,\n',
-            '    lib4,\n',
-            '    lib5\n',
-            ')\n'
-        ],
-            'from .parent import (\n'
-            '    lib2,\n'
-            '    lib5\n'
-            ')\n'
+        self.unused = [".parent.lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "from .parent import (\n",
+                "    lib1,\n",
+                "    lib2,\n",
+                "    lib3,\n",
+                "    lib4,\n",
+                "    lib5\n",
+                ")\n",
+            ],
+            "from .parent import (\n" "    lib2,\n" "    lib5\n" ")\n",
         )
 
     def test_fix_without_from(self):
-        self.unused = ['lib' + str(x) for x in (1, 3, 4)]
+        self.unused = ["lib" + str(x) for x in (1, 3, 4)]
 
         # Multiline but not "from"
-        self.assert_fix([
-            'import \\\n',
-            '    lib1, lib2, lib3 \\\n',
-            '    ,lib4, lib5, lib6\n'
-        ],
-            'import \\\n'
-            '    lib2, lib5, lib6\n'
+        self.assert_fix(
+            ["import \\\n", "    lib1, lib2, lib3 \\\n", "    ,lib4, lib5, lib6\n"],
+            "import \\\n" "    lib2, lib5, lib6\n",
         )
-        self.assert_fix([
-            'import lib1, lib2, lib3, \\\n',
-            '       lib4, lib5, lib6\n'
-        ],
-            'import lib2, lib5, lib6\n'
+        self.assert_fix(
+            ["import lib1, lib2, lib3, \\\n", "       lib4, lib5, lib6\n"],
+            "import lib2, lib5, lib6\n",
         )
 
         # Problematic example without "from"
-        self.assert_fix([
-            'import \\\n',
-            '    lib1,\\\n',
-            '    lib2, \\\n',
-            '    libA\\\n',  # used import with no commas
-            '    ,lib3, \\\n',  # leading and trailing commas with unused
-            '    libB, \\\n',
-            '    \\  \n',  # empty line with continuation
-            '    lib4\\\n',  # unused import with comment
-            '\n'
-        ],
-            'import \\\n'
-            '    lib2,\\\n'
-            '    libA, \\\n'
-            '    libB\\\n'
-            '\n'
+        self.assert_fix(
+            [
+                "import \\\n",
+                "    lib1,\\\n",
+                "    lib2, \\\n",
+                "    libA\\\n",  # used import with no commas
+                "    ,lib3, \\\n",  # leading and trailing commas with unused
+                "    libB, \\\n",
+                "    \\  \n",  # empty line with continuation
+                "    lib4\\\n",  # unused import with comment
+                "\n",
+            ],
+            "import \\\n" "    lib2,\\\n" "    libA, \\\n" "    libB\\\n" "\n",
         )
 
-        self.unused = ['lib{}.x.y.z'.format(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'import \\\n',
-            '    lib1.x.y.z \\',
-            '    , \\\n',
-            '    lib2.x.y.z \\\n',
-            '    , \\\n',
-            '    lib3.x.y.z \\\n',
-            '    , \\\n',
-            '    lib4.x.y.z \\\n',
-            '    , \\\n',
-            '    lib5.x.y.z\n'
-        ],
-            'import \\\n'
-            '    lib2.x.y.z \\'
-            '    , \\\n'
-            '    lib5.x.y.z\n'
+        self.unused = [f"lib{x}.x.y.z" for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "import \\\n",
+                "    lib1.x.y.z \\",
+                "    , \\\n",
+                "    lib2.x.y.z \\\n",
+                "    , \\\n",
+                "    lib3.x.y.z \\\n",
+                "    , \\\n",
+                "    lib4.x.y.z \\\n",
+                "    , \\\n",
+                "    lib5.x.y.z\n",
+            ],
+            "import \\\n" "    lib2.x.y.z \\" "    , \\\n" "    lib5.x.y.z\n",
         )
 
     def test_give_up(self):
         # Semicolon
-        self.unused = ['lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'import \\\n',
-            '    lib1, lib2, lib3, \\\n',
-            '    lib4, lib5; import lib6\n'
-        ],
-            'import \\\n'
-            '    lib1, lib2, lib3, \\\n'
-            '    lib4, lib5; import lib6\n'
+        self.unused = ["lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "import \\\n",
+                "    lib1, lib2, lib3, \\\n",
+                "    lib4, lib5; import lib6\n",
+            ],
+            "import \\\n" "    lib1, lib2, lib3, \\\n" "    lib4, lib5; import lib6\n",
         )
         # Comments
-        self.unused = ['.lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'from . import ( # comment\n',
-            '    lib1,\\\n',  # only unused + line continuation
-            '    lib2, \n',
-            '    libA\n',  # used import with no commas
-            '    ,lib3, \n',  # leading and trailing commas with unused import
-            '    libB, \n',
-            '    \\  \n',  # empty line with continuation
-            '    lib4,  # noqa \n',  # unused import with comment
-            ') ; import sys\n'
-        ],
-            'from . import ( # comment\n'
-            '    lib1,\\\n'
-            '    lib2, \n'
-            '    libA\n'
-            '    ,lib3, \n'
-            '    libB, \n'
-            '    \\  \n'
-            '    lib4,  # noqa \n'
-            ') ; import sys\n'
+        self.unused = [".lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "from . import ( # comment\n",
+                "    lib1,\\\n",  # only unused + line continuation
+                "    lib2, \n",
+                "    libA\n",  # used import with no commas
+                "    ,lib3, \n",  # leading and trailing commas with unused import
+                "    libB, \n",
+                "    \\  \n",  # empty line with continuation
+                "    lib4,  # noqa \n",  # unused import with comment
+                ") ; import sys\n",
+            ],
+            "from . import ( # comment\n"
+            "    lib1,\\\n"
+            "    lib2, \n"
+            "    libA\n"
+            "    ,lib3, \n"
+            "    libB, \n"
+            "    \\  \n"
+            "    lib4,  # noqa \n"
+            ") ; import sys\n",
         )
 
     def test_just_one_import_used(self):
-        self.unused = ['lib2']
-        self.assert_fix([
-            'import \\\n',
-            '    lib1\n'
-        ],
-            'import \\\n'
-            '    lib1\n'
-        )
-        self.assert_fix([
-            'import \\\n',
-            '    lib2\n'
-        ],
-            'pass\n'
-        )
+        self.unused = ["lib2"]
+        self.assert_fix(["import \\\n", "    lib1\n"], "import \\\n" "    lib1\n")
+        self.assert_fix(["import \\\n", "    lib2\n"], "pass\n")
         # Example from issue #8
-        self.unused = ['re.subn']
-        self.assert_fix([
-            '\tfrom re import (subn)\n',
-        ],
-            '\tpass\n',
+        self.unused = ["re.subn"]
+        self.assert_fix(
+            [
+                "\tfrom re import (subn)\n",
+            ],
+            "\tpass\n",
         )
 
     def test_just_one_import_left(self):
         # Examples from issue #8
-        self.unused = ['math.sqrt']
-        self.assert_fix([
-            'from math import (\n',
-            '        sqrt,\n',
-            '        log\n',
-            '    )\n'
-        ],
-            'from math import (\n'
-            '        log\n'
-            '    )\n'
+        self.unused = ["math.sqrt"]
+        self.assert_fix(
+            ["from math import (\n", "        sqrt,\n", "        log\n", "    )\n"],
+            "from math import (\n" "        log\n" "    )\n",
         )
-        self.unused = ['module.b']
-        self.assert_fix([
-            'from module import (a, b)\n',
-        ],
-            'from module import a\n',
+        self.unused = ["module.b"]
+        self.assert_fix(
+            [
+                "from module import (a, b)\n",
+            ],
+            "from module import a\n",
         )
-        self.assert_fix([
-            'from module import (a,\n',
-            '                    b)\n',
-        ],
-            'from module import a\n',
+        self.assert_fix(
+            [
+                "from module import (a,\n",
+                "                    b)\n",
+            ],
+            "from module import a\n",
         )
         self.unused = []
-        self.assert_fix([
-            'from re import (subn)\n',
-        ],
-            'from re import (subn)\n',
+        self.assert_fix(
+            [
+                "from re import (subn)\n",
+            ],
+            "from re import (subn)\n",
         )
 
     def test_no_empty_imports(self):
-        self.unused = ['lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'import \\\n',
-            '    lib1, lib3, \\\n',
-            '    lib4 \n'
-        ],
-            'pass \n'
+        self.unused = ["lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            ["import \\\n", "    lib1, lib3, \\\n", "    lib4 \n"],
+            "pass \n",
         )
 
         # Indented parenthesized block
-        self.unused = ['.parent.lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            '\t\tfrom .parent import (\n',
-            '    lib1,\n',
-            '    lib3,\n',
-            '    lib4,\n',
-            ')\n'
-        ],
-            '\t\tpass\n'
+        self.unused = [".parent.lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "\t\tfrom .parent import (\n",
+                "    lib1,\n",
+                "    lib3,\n",
+                "    lib4,\n",
+                ")\n",
+            ],
+            "\t\tpass\n",
         )
 
     def test_without_remove_all(self):
-        self.unused = ['lib' + str(x) for x in (1, 3, 4)]
-        self.assert_fix([
-            'import \\\n',
-            '    lib1,\\\n',
-            '    lib3,\\\n',
-            '    lib4\n',
-        ],
-            'import \\\n'
-            '    lib1,\\\n'
-            '    lib3,\\\n'
-            '    lib4\n',
-            remove_all=False
+        self.unused = ["lib" + str(x) for x in (1, 3, 4)]
+        self.assert_fix(
+            [
+                "import \\\n",
+                "    lib1,\\\n",
+                "    lib3,\\\n",
+                "    lib4\n",
+            ],
+            "import \\\n" "    lib1,\\\n" "    lib3,\\\n" "    lib4\n",
+            remove_all=False,
         )
 
-        self.unused += ['os.path.' + x for x in ('dirname', 'isdir', 'join')]
-        self.assert_fix([
-            'from os.path import (\n',
-            '    dirname,\n',
-            '    isdir,\n',
-            '    join,\n',
-            ')\n'
-        ],
-            'pass\n',
-            remove_all=False
+        self.unused += ["os.path." + x for x in ("dirname", "isdir", "join")]
+        self.assert_fix(
+            [
+                "from os.path import (\n",
+                "    dirname,\n",
+                "    isdir,\n",
+                "    join,\n",
+                ")\n",
+            ],
+            "pass\n",
+            remove_all=False,
         )
-        self.assert_fix([
-            'import \\\n',
-            '    os.path.dirname, \\\n',
-            '    lib1, \\\n',
-            '    lib3\n',
-        ],
-            'import \\\n'
-            '    lib1, \\\n'
-            '    lib3\n',
-            remove_all=False
+        self.assert_fix(
+            [
+                "import \\\n",
+                "    os.path.dirname, \\\n",
+                "    lib1, \\\n",
+                "    lib3\n",
+            ],
+            "import \\\n" "    lib1, \\\n" "    lib3\n",
+            remove_all=False,
         )
 
 
 @contextlib.contextmanager
-def temporary_file(contents, directory='.', suffix='.py', prefix=''):
+def temporary_file(contents, directory=".", suffix=".py", prefix=""):
     """Write contents to temporary file and yield it."""
-    f = tempfile.NamedTemporaryFile(suffix=suffix, prefix=prefix,
-                                    delete=False, dir=directory)
+    f = tempfile.NamedTemporaryFile(
+        suffix=suffix,
+        prefix=prefix,
+        delete=False,
+        dir=directory,
+    )
     try:
         f.write(contents.encode())
         f.close()
@@ -2185,7 +2424,7 @@ def temporary_file(contents, directory='.', suffix='.py', prefix=''):
 
 
 @contextlib.contextmanager
-def temporary_directory(directory='.', prefix='tmp.'):
+def temporary_directory(directory=".", prefix="tmp."):
     """Create temporary directory and yield its path."""
     temp_directory = tempfile.mkdtemp(prefix=prefix, dir=directory)
     try:
@@ -2194,13 +2433,9 @@ def temporary_directory(directory='.', prefix='tmp.'):
         shutil.rmtree(temp_directory)
 
 
-class StubFile(object):
+class StubFile:
 
     """Fake file that ignores everything."""
 
     def write(*_):
         """Ignore."""
-
-
-if __name__ == '__main__':
-    unittest.main()

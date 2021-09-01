@@ -1,6 +1,6 @@
--   id: autoflake
-    name: autoflake
-    entry: autoflake
-    language: python
-    'types': [python]
-    require_serial: true
+- id: autoflake8
+  name: autoflake8
+  entry: autoflake8
+  language: python
+  "types": [python]
+  require_serial: true
