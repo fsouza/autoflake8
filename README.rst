@@ -2,8 +2,8 @@
 autoflake
 =========
 
-.. image:: https://travis-ci.org/myint/autoflake.svg?branch=master
-    :target: https://travis-ci.org/myint/autoflake
+.. image:: https://github.com/fsouza/autoflake8/actions/workflows/main.yaml/badge.svg?branch=main
+    :target: https://github.com/fsouza/autoflake8/actions/workflows/main.yaml
     :alt: Build status
 
 
