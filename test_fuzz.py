@@ -4,19 +4,24 @@ This checks that autoflake never introduces incorrect syntax. This is
 done by doing a syntax check after the autoflake run. The number of
 Pyflakes warnings is also confirmed to always improve.
 """
+import argparse
+import difflib
 import os
+import pathlib
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
+from typing import List
+from typing import Optional
+from typing import Sequence
 
 import autoflake
 
 
-ROOT_PATH = os.path.abspath(os.path.dirname(__file__))
-AUTOFLAKE_BIN = "'{}' '{}'".format(
-    sys.executable,
-    os.path.join(ROOT_PATH, "autoflake.py"),
-)
+ROOT_PATH = pathlib.Path(__file__).parent.absolute()
+AUTOFLAKE_BIN = f"'{sys.executable}' '{ROOT_PATH / 'autoflake.py'}'"
 
 if sys.stdout.isatty():
     YELLOW = "\x1b[33m"
@@ -26,119 +31,119 @@ else:
     END = ""
 
 
-try:
-    unicode
-except NameError:
-    unicode = str
-
-
 def colored(text, color):
     """Return color coded text."""
     return color + text + END
 
 
-def pyflakes_count(filename):
+def pyflakes_count(filename: str) -> int:
     """Return pyflakes error count."""
-    with autoflake.open_with_encoding(
-        filename,
-        encoding=autoflake.detect_encoding(filename),
-    ) as f:
+    with open(filename) as f:
         return len(list(autoflake.check(f.read())))
 
 
-def readlines(filename):
+def readlines(filename: str) -> Sequence[str]:
     """Return contents of file as a list of lines."""
-    with autoflake.open_with_encoding(
-        filename,
-        encoding=autoflake.detect_encoding(filename),
-    ) as f:
+    with open(filename) as f:
         return f.readlines()
 
 
-def diff(before, after):
+def diff(before: str, after: str) -> str:
     """Return diff of two files."""
-    import difflib
 
     return "".join(
         difflib.unified_diff(readlines(before), readlines(after), before, after),
     )
 
 
-def run(filename, command, verbose=False, options=None):
-    """Run autoflake on file at filename.
+def run(
+    filename: str,
+    command: str,
+    verbose: bool = False,
+    options: Optional[List[str]] = None,
+) -> bool:
+    """
+    Run autoflake on file at filename.
 
     Return True on success.
     """
     if not options:
         options = []
 
-    import test_autoflake
+    temp_directory: Optional[str] = None
+    try:
+        temp_directory = tempfile.mkdtemp()
+        return _run(filename, command, temp_directory, verbose, options)
+    finally:
+        if temp_directory is not None:
+            shutil.rmtree(temp_directory)
 
-    with test_autoflake.temporary_directory() as temp_directory:
-        temp_filename = os.path.join(temp_directory, os.path.basename(filename))
-        import shutil
 
-        shutil.copyfile(filename, temp_filename)
+def _run(
+    filename: str,
+    command: str,
+    temp_directory: str,
+    verbose: bool,
+    options: List[str],
+) -> bool:
+    temp_filename = os.path.join(temp_directory, os.path.basename(filename))
 
-        if 0 != subprocess.call(
-            shlex.split(command) + ["--in-place", temp_filename] + options,
-        ):
-            sys.stderr.write("autoflake crashed on " + filename + "\n")
-            return False
+    shutil.copyfile(filename, temp_filename)
 
-        try:
-            file_diff = diff(filename, temp_filename)
-            if verbose:
-                sys.stderr.write(file_diff)
+    if 0 != subprocess.call(
+        shlex.split(command) + ["--in-place", temp_filename] + options,
+    ):
+        sys.stderr.write("autoflake crashed on " + filename + "\n")
+        return False
 
-            if check_syntax(filename):
-                try:
-                    check_syntax(temp_filename, raise_error=True)
-                except (
-                    SyntaxError,
-                    TypeError,
-                    UnicodeDecodeError,
-                    ValueError,
-                ) as exception:
-                    sys.stderr.write(
-                        "autoflake broke " + filename + "\n" + str(exception) + "\n",
-                    )
-                    return False
+    try:
+        file_diff = diff(filename, temp_filename)
+        if verbose:
+            sys.stderr.write(file_diff)
 
-            before_count = pyflakes_count(filename)
-            after_count = pyflakes_count(temp_filename)
-
-            if verbose:
-                print("(before, after):", (before_count, after_count))
-
-            if file_diff and after_count > before_count:
-                sys.stderr.write("autoflake made " + filename + " worse\n")
+        if check_syntax(filename):
+            try:
+                check_syntax(temp_filename, raise_error=True)
+            except (
+                SyntaxError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                sys.stderr.write(
+                    f"autoflake broke {filename}\n{str(exc)}\n",
+                )
                 return False
-        except OSError as exception:
-            sys.stderr.write(str(exception) + "\n")
+
+        before_count = pyflakes_count(filename)
+        after_count = pyflakes_count(temp_filename)
+
+        if verbose:
+            print("(before, after):", (before_count, after_count))
+
+        if file_diff and after_count > before_count:
+            sys.stderr.write(f"autoflake made {filename} worse\n")
+            return False
+    except OSError as exc:
+        sys.stderr.write(f"{str(exc)}\n")
 
     return True
 
 
-def check_syntax(filename, raise_error=False):
+def check_syntax(filename: str, raise_error: bool = False) -> bool:
     """Return True if syntax is okay."""
-    with autoflake.open_with_encoding(
-        filename,
-        encoding=autoflake.detect_encoding(filename),
-    ) as input_file:
+    with open(filename) as input_file:
         try:
             compile(input_file.read(), "<string>", "exec", dont_inherit=True)
             return True
-        except (SyntaxError, TypeError, UnicodeDecodeError, ValueError):
+        except (SyntaxError, TypeError, ValueError):
             if raise_error:
                 raise
             else:
                 return False
 
 
-def process_args():
+def process_args() -> argparse.Namespace:
     """Return processed arguments (options and positional arguments)."""
-    import argparse
 
     parser = argparse.ArgumentParser()
 
@@ -186,8 +191,9 @@ def process_args():
     return parser.parse_args()
 
 
-def check(args):
-    """Run recursively run autoflake on directory of files.
+def check(args: argparse.Namespace) -> bool:
+    """
+    Run recursively run autoflake on directory of files.
 
     Return False if the fix results in broken syntax.
     """
@@ -218,50 +224,44 @@ def check(args):
     files_to_skip = {"bad_coding.py"}
 
     while filenames:
-        try:
-            name = os.path.realpath(filenames.pop(0))
-            basename = os.path.basename(name)
-            if not os.path.exists(name):
-                # Invalid symlink.
-                continue
-
-            if name in completed_filenames:
-                sys.stderr.write(
-                    colored("--->  Skipping previously tested " + name + "\n", YELLOW),
-                )
-                continue
-            else:
-                completed_filenames.update(name)
-
-            if os.path.isdir(name):
-                for root, directories, children in os.walk(unicode(name)):
-                    filenames += [
-                        os.path.join(root, f)
-                        for f in children
-                        if f.endswith(".py") and not f.startswith(".")
-                    ]
-
-                    directories[:] = [d for d in directories if not d.startswith(".")]
-            elif basename not in files_to_skip:
-                verbose_message = "--->  Testing with " + name
-                sys.stderr.write(colored(verbose_message + "\n", YELLOW))
-
-                if not run(
-                    os.path.join(name),
-                    command=args.command,
-                    verbose=args.verbose,
-                    options=options,
-                ):
-                    return False
-        except (UnicodeDecodeError, UnicodeEncodeError) as exception:
-            # Ignore annoying codec problems on Python 2.
-            print(exception, file=sys.stderr)
+        name = os.path.realpath(filenames.pop(0))
+        basename = os.path.basename(name)
+        if not os.path.exists(name):
+            # Invalid symlink.
             continue
+
+        if name in completed_filenames:
+            sys.stderr.write(
+                colored(f"--->  Skipping previously tested {name}\n", YELLOW),
+            )
+            continue
+        else:
+            completed_filenames.update(name)
+
+        if os.path.isdir(name):
+            for root, directories, children in os.walk(name):
+                filenames += [
+                    os.path.join(root, f)
+                    for f in children
+                    if f.endswith(".py") and not f.startswith(".")
+                ]
+
+                directories[:] = [d for d in directories if not d.startswith(".")]
+        elif basename not in files_to_skip:
+            sys.stderr.write(colored(f"--->  Testing with {name}\n", YELLOW))
+
+            if not run(
+                os.path.join(name),
+                command=args.command,
+                verbose=args.verbose,
+                options=options,
+            ):
+                return False
 
     return True
 
 
-def main():
+def main() -> int:
     """Run main."""
     return 0 if check(process_args()) else 1
 
