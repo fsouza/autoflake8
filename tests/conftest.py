@@ -6,6 +6,7 @@ import sys
 import tempfile
 from contextlib import _GeneratorContextManager
 from typing import Callable
+from typing import IO
 from typing import Iterator
 from typing import List
 
@@ -61,3 +62,9 @@ def root_dir() -> pathlib.Path:
 @pytest.fixture
 def autoflake8_command(root_dir: pathlib.Path) -> List[str]:
     return [sys.executable, str(root_dir / "autoflake.py")]
+
+
+@pytest.fixture
+def devnull() -> Iterator[IO[str]]:
+    with open(os.devnull, "r+") as f:
+        yield f

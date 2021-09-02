@@ -24,9 +24,6 @@ class UnitTests(unittest.TestCase):
 
     """Unit tests."""
 
-    def test_imports(self):
-        self.assertGreater(len(autoflake.SAFE_IMPORTS), 0)
-
     def test_unused_import_line_numbers(self):
         self.assertEqual(
             [1],
@@ -420,7 +417,7 @@ print(a)
 
     def test_multiline_import(self):
         self.assertTrue(
-            autoflake.multiline_import(
+            autoflake.is_multiline_import(
                 r"""\
 import os, \
     math, subprocess
@@ -429,7 +426,7 @@ import os, \
         )
 
         self.assertFalse(
-            autoflake.multiline_import(
+            autoflake.is_multiline_import(
                 """\
 import os, math, subprocess
 """,
@@ -437,7 +434,7 @@ import os, math, subprocess
         )
 
         self.assertTrue(
-            autoflake.multiline_import(
+            autoflake.is_multiline_import(
                 """\
 import os, math, subprocess
 """,
@@ -445,15 +442,15 @@ import os, math, subprocess
             ),
         )
 
-        self.assertTrue(autoflake.multiline_import("from os import (path, sep)"))
+        self.assertTrue(autoflake.is_multiline_import("from os import (path, sep)"))
 
     def test_multiline_statement(self):
-        self.assertFalse(autoflake.multiline_statement("x = foo()"))
+        self.assertFalse(autoflake.is_multiline_statement("x = foo()"))
 
-        self.assertTrue(autoflake.multiline_statement("x = 1;"))
-        self.assertTrue(autoflake.multiline_statement("import os, \\"))
-        self.assertTrue(autoflake.multiline_statement("foo("))
-        self.assertTrue(autoflake.multiline_statement("1", previous_line="x = \\"))
+        self.assertTrue(autoflake.is_multiline_statement("x = 1;"))
+        self.assertTrue(autoflake.is_multiline_statement("import os, \\"))
+        self.assertTrue(autoflake.is_multiline_statement("foo("))
+        self.assertTrue(autoflake.is_multiline_statement("1", previous_line="x = \\"))
 
     def test_break_up_import(self):
         self.assertEqual(

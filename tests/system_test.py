@@ -2,6 +2,7 @@ import io
 import subprocess
 from contextlib import _GeneratorContextManager
 from typing import Callable
+from typing import IO
 from typing import List
 from unittest import mock
 
@@ -10,7 +11,10 @@ import pytest
 import autoflake
 
 
-def test_diff(temporary_file: Callable[..., _GeneratorContextManager[str]]) -> None:
+def test_diff(
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
+) -> None:
     with temporary_file(
         """\
 import re
@@ -22,25 +26,27 @@ x = 1
         output_file = io.StringIO()
         autoflake._main(
             argv=["my_fake_program", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
 
         expected = """\
 -import re
 -import os
- import my_own_module
+-import my_own_module
  x = 1
 """
         assert "\n".join(output_file.getvalue().split("\n")[3:]) == expected
 
 
-def test_diff_with_nonexistent_file() -> None:
+def test_diff_with_nonexistent_file(devnull: IO[str]) -> None:
     output_file = io.StringIO()
     autoflake._main(
         argv=["my_fake_program", "nonexistent_file"],
-        standard_out=output_file,
-        standard_error=output_file,
+        stdout=output_file,
+        stderr=output_file,
+        stdin=devnull,
     )
 
     assert "no such file" in output_file.getvalue().lower()
@@ -48,6 +54,7 @@ def test_diff_with_nonexistent_file() -> None:
 
 def test_diff_with_encoding_declaration(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file(
         """\
@@ -61,21 +68,25 @@ x = 1
         output_file = io.StringIO()
         autoflake._main(
             argv=["my_fake_program", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
         expected = """\
  # coding: iso-8859-1
 -import re
 -import os
- import my_own_module
+-import my_own_module
  x = 1
 """
 
         assert "\n".join(output_file.getvalue().split("\n")[3:]) == expected
 
 
-def test_in_place(temporary_file: Callable[..., _GeneratorContextManager[str]]) -> None:
+def test_in_place(
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
+) -> None:
     with temporary_file(
         """\
 import foo
@@ -92,8 +103,9 @@ except ImportError:
         output_file = io.StringIO()
         autoflake._main(
             argv=["my_fake_program", "--in-place", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
         with open(filename) as f:
             expected = """\
@@ -112,14 +124,16 @@ except ImportError:
 
 def test_check_with_empty_file(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file("") as filename:
         output_file = io.StringIO()
 
         autoflake._main(
             argv=["my_fake_program", "--check", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
 
         assert output_file.getvalue() == "No issues detected!\n"
@@ -127,6 +141,7 @@ def test_check_with_empty_file(
 
 def test_check_correct_file(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file(
         """\
@@ -139,8 +154,9 @@ print(x)
 
         autoflake._main(
             argv=["my_fake_program", "--check", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
 
         assert output_file.getvalue() == "No issues detected!\n"
@@ -148,6 +164,7 @@ print(x)
 
 def test_check_useless_pass(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file(
         """\
@@ -170,8 +187,9 @@ except ImportError:
         with pytest.raises(SystemExit) as excinfo:
             autoflake._main(
                 argv=["my_fake_program", "--check", filename],
-                standard_out=output_file,
-                standard_error=None,
+                stdout=output_file,
+                stderr=devnull,
+                stdin=devnull,
             )
 
         assert excinfo.value.code == 1
@@ -182,13 +200,15 @@ except ImportError:
 
 def test_in_place_with_empty_file(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file("") as filename:
         output_file = io.StringIO()
         autoflake._main(
             argv=["my_fake_program", "--in-place", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
         with open(filename) as f:
             assert f.read() == ""
@@ -196,6 +216,7 @@ def test_in_place_with_empty_file(
 
 def test_in_place_with_with_useless_pass(
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_file(
         """\
@@ -216,8 +237,9 @@ except ImportError:
         output_file = io.StringIO()
         autoflake._main(
             argv=["my_fake_program", "--in-place", filename],
-            standard_out=output_file,
-            standard_error=None,
+            stdout=output_file,
+            stderr=devnull,
+            stdin=devnull,
         )
         with open(filename) as f:
             expected = """\
@@ -234,14 +256,14 @@ except ImportError:
             assert f.read() == expected
 
 
-def test_with_missing_file() -> None:
+def test_with_missing_file(devnull: IO[str]) -> None:
     output_file = mock.Mock()
-    ignore = mock.Mock()
 
     autoflake._main(
         argv=["my_fake_program", "--in-place", ".fake"],
-        standard_out=output_file,
-        standard_error=ignore,
+        stdout=output_file,
+        stderr=devnull,
+        stdin=devnull,
     )
 
     output_file.write.assert_not_called()
@@ -250,6 +272,7 @@ def test_with_missing_file() -> None:
 def test_ignore_hidden_directories(
     temporary_directory: Callable[..., _GeneratorContextManager[str]],
     temporary_file: Callable[..., _GeneratorContextManager[str]],
+    devnull: IO[str],
 ) -> None:
     with temporary_directory() as directory:
         with temporary_directory(
@@ -269,31 +292,22 @@ import os
 
                 autoflake._main(
                     argv=["my_fake_program", "--recursive", directory],
-                    standard_out=output_file,
-                    standard_error=None,
+                    stdout=output_file,
+                    stderr=devnull,
+                    stdin=devnull,
                 )
 
                 assert output_file.getvalue().strip() == ""
 
 
-def test_redundant_options() -> None:
-    output_file = io.StringIO()
-    autoflake._main(
-        argv=["my_fake_program", "--remove-all", "--imports=blah", __file__],
-        standard_out=output_file,
-        standard_error=output_file,
-    )
-
-    assert "redundant" in output_file.getvalue()
-
-
-def test_in_place_and_stdout() -> None:
+def test_in_place_and_stdout(devnull: IO[str]) -> None:
     output_file = io.StringIO()
     with pytest.raises(SystemExit):
         autoflake._main(
             argv=["my_fake_program", "--in-place", "--stdout", __file__],
-            standard_out=output_file,
-            standard_error=output_file,
+            stdout=output_file,
+            stderr=output_file,
+            stdin=devnull,
         )
 
 
@@ -310,36 +324,7 @@ print(x)
 """,
     ) as filename:
         process = subprocess.Popen(
-            autoflake8_command + ["--imports=fake_foo,fake_bar", filename],
-            stdout=subprocess.PIPE,
-        )
-
-        expected = """\
--import fake_fake, fake_foo, fake_bar, fake_zoo
--import re, os
-+import fake_fake
-+import fake_zoo
-+import os
- x = os.sep
- print(x)
-"""
-        assert "\n".join(process.communicate()[0].decode().split("\n")[3:]) == expected
-
-
-def test_end_to_end_with_remove_all_unused_imports(
-    autoflake8_command: List[str],
-    temporary_file: Callable[..., _GeneratorContextManager[str]],
-) -> None:
-    with temporary_file(
-        """\
-import fake_fake, fake_foo, fake_bar, fake_zoo
-import re, os
-x = os.sep
-print(x)
-""",
-    ) as filename:
-        process = subprocess.Popen(
-            autoflake8_command + ["--remove-all", filename],
+            autoflake8_command + [filename],
             stdout=subprocess.PIPE,
         )
         expected = """\
@@ -467,28 +452,6 @@ print(a)
         assert result == expected
 
 
-def test_end_to_end_with_error(
-    autoflake8_command: List[str],
-    temporary_file: Callable[..., _GeneratorContextManager[str]],
-):
-    with temporary_file(
-        """\
-import fake_fake, fake_foo, fake_bar, fake_zoo
-import re, os
-x = os.sep
-print(x)
-""",
-    ) as filename:
-        process = subprocess.Popen(
-            autoflake8_command
-            + ["--imports=fake_foo,fake_bar", "--remove-all", filename],
-            stderr=subprocess.PIPE,
-        )
-
-        _, stderr = process.communicate()
-        assert "redundant" in stderr.decode()
-
-
 def test_end_to_end_from_stdin(
     autoflake8_command: List[str],
 ):
@@ -499,7 +462,7 @@ x = os.sep
 print(x)
 """
     process = subprocess.Popen(
-        autoflake8_command + ["--remove-all", "-"],
+        autoflake8_command + ["-"],
         stdout=subprocess.PIPE,
         stdin=subprocess.PIPE,
     )
@@ -522,7 +485,7 @@ x = os.sep
 print(x)
 """
     process = subprocess.Popen(
-        autoflake8_command + ["--remove-all", "--in-place", "-"],
+        autoflake8_command + ["--in-place", "-"],
         stdout=subprocess.PIPE,
         stdin=subprocess.PIPE,
     )

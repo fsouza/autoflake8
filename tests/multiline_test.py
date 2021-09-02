@@ -1,5 +1,4 @@
 import functools
-from typing import Optional
 from typing import Sequence
 from typing import Tuple
 
@@ -38,13 +37,11 @@ def test_is_over_multi_on_single_physical_line() -> None:
 def assert_fix(
     lines: Sequence[str],
     result: str,
-    unused: Optional[Tuple[str, ...]] = None,
-    remove_all: bool = True,
+    unused: Tuple[str, ...] = (),
 ) -> None:
     fixer = autoflake.FilterMultilineImport(
         lines[0],
-        remove_all_unused_imports=remove_all,
-        unused_module=unused or (),
+        unused_module=unused,
     )
     fixed = functools.reduce(
         lambda acc, x: acc(x)
@@ -449,45 +446,4 @@ def test_no_empty_imports() -> None:
         ],
         "\t\tpass\n",
         unused=tuple(".parent.lib" + x for x in ("1", "3", "4")),
-    )
-
-
-def test_without_remove_all() -> None:
-    unused = tuple("lib" + x for x in ("1", "3", "4"))
-    assert_fix(
-        [
-            "import \\\n",
-            "    lib1,\\\n",
-            "    lib3,\\\n",
-            "    lib4\n",
-        ],
-        "import \\\n" "    lib1,\\\n" "    lib3,\\\n" "    lib4\n",
-        remove_all=False,
-        unused=unused,
-    )
-
-    unused += tuple("os.path." + x for x in ("dirname", "isdir", "join"))
-    assert_fix(
-        [
-            "from os.path import (\n",
-            "    dirname,\n",
-            "    isdir,\n",
-            "    join,\n",
-            ")\n",
-        ],
-        "pass\n",
-        remove_all=False,
-        unused=unused,
-    )
-
-    assert_fix(
-        [
-            "import \\\n",
-            "    os.path.dirname, \\\n",
-            "    lib1, \\\n",
-            "    lib3\n",
-        ],
-        "import \\\n" "    lib1, \\\n" "    lib3\n",
-        remove_all=False,
-        unused=unused,
     )
