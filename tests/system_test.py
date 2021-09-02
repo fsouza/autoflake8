@@ -5,8 +5,9 @@ from typing import Callable
 from typing import List
 from unittest import mock
 
-import autoflake
 import pytest
+
+import autoflake
 
 
 def test_diff(temporary_file: Callable[..., _GeneratorContextManager[str]]) -> None:

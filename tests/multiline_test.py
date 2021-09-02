@@ -57,7 +57,7 @@ def assert_fix(
 
 
 def test_fix() -> None:
-    unused = tuple(["third_party.lib" + x for x in ("1", "3", "4")])
+    unused = tuple("third_party.lib" + x for x in ("1", "3", "4"))
 
     # Example m0 (isort)
     assert_fix(
@@ -209,7 +209,7 @@ def test_fix() -> None:
 
 
 def test_indentation() -> None:
-    unused = tuple(["third_party.lib" + x for x in ("1", "3", "4")])
+    unused = tuple("third_party.lib" + x for x in ("1", "3", "4"))
 
     assert_fix(
         [
@@ -240,7 +240,7 @@ def test_fix_relative() -> None:
             "               lib4, lib5, lib6)\n",
         ],
         "from . import (lib2, lib5, lib6)\n",
-        unused=tuple([".lib" + x for x in ("1", "3", "4")]),
+        unused=tuple(".lib" + x for x in ("1", "3", "4")),
     )
 
     # Example m1(isort)
@@ -254,7 +254,7 @@ def test_fix_relative() -> None:
             "                lib6)\n",
         ],
         "from .. import (lib2,\n" "                lib5,\n" "                lib6)\n",
-        unused=tuple(["..lib" + x for x in ("1", "3", "4")]),
+        unused=tuple("..lib" + x for x in ("1", "3", "4")),
     )
 
     # Example m2 (isort)
@@ -265,7 +265,7 @@ def test_fix_relative() -> None:
             "    lib4, lib5, lib6\n",
         ],
         "from ... import \\\n" "    lib2, lib5, lib6\n",
-        unused=tuple(["...lib" + str(x) for x in (1, 3, 4)]),
+        unused=tuple("...lib" + str(x) for x in (1, 3, 4)),
     )
 
     # Example m3 (isort)
@@ -280,12 +280,12 @@ def test_fix_relative() -> None:
             ")\n",
         ],
         "from .parent import (\n" "    lib2,\n" "    lib5\n" ")\n",
-        unused=tuple([".parent.lib" + x for x in ("1", "3", "4")]),
+        unused=tuple(".parent.lib" + x for x in ("1", "3", "4")),
     )
 
 
 def test_fix_without_from() -> None:
-    unused = tuple(["lib" + str(x) for x in (1, 3, 4)])
+    unused = tuple("lib" + str(x) for x in (1, 3, 4))
 
     # Multiline but not "from"
     assert_fix(
@@ -331,7 +331,7 @@ def test_fix_without_from() -> None:
             "    lib5.x.y.z\n",
         ],
         "import \\\n" "    lib2.x.y.z \\" "    , \\\n" "    lib5.x.y.z\n",
-        unused=tuple([f"lib{x}.x.y.z" for x in (1, 3, 4)]),
+        unused=tuple(f"lib{x}.x.y.z" for x in (1, 3, 4)),
     )
 
 
@@ -344,7 +344,7 @@ def test_give_up() -> None:
             "    lib4, lib5; import lib6\n",
         ],
         "import \\\n" "    lib1, lib2, lib3, \\\n" "    lib4, lib5; import lib6\n",
-        unused=tuple(["lib" + str(x) for x in (1, 3, 4)]),
+        unused=tuple("lib" + str(x) for x in (1, 3, 4)),
     )
 
     # Comments
@@ -369,7 +369,7 @@ def test_give_up() -> None:
         "    \\  \n"
         "    lib4,  # noqa \n"
         ") ; import sys\n",
-        unused=tuple([".lib" + str(x) for x in (1, 3, 4)]),
+        unused=tuple(".lib" + str(x) for x in (1, 3, 4)),
     )
 
 
@@ -435,7 +435,7 @@ def test_no_empty_imports() -> None:
     assert_fix(
         ["import \\\n", "    lib1, lib3, \\\n", "    lib4 \n"],
         "pass \n",
-        unused=tuple(["lib" + x for x in ("1", "3", "4")]),
+        unused=tuple("lib" + x for x in ("1", "3", "4")),
     )
 
     # Indented parenthesized block
@@ -448,12 +448,12 @@ def test_no_empty_imports() -> None:
             ")\n",
         ],
         "\t\tpass\n",
-        unused=tuple([".parent.lib" + x for x in ("1", "3", "4")]),
+        unused=tuple(".parent.lib" + x for x in ("1", "3", "4")),
     )
 
 
 def test_without_remove_all() -> None:
-    unused = tuple(["lib" + x for x in ("1", "3", "4")])
+    unused = tuple("lib" + x for x in ("1", "3", "4"))
     assert_fix(
         [
             "import \\\n",
@@ -466,7 +466,7 @@ def test_without_remove_all() -> None:
         unused=unused,
     )
 
-    unused += tuple(["os.path." + x for x in ("dirname", "isdir", "join")])
+    unused += tuple("os.path." + x for x in ("dirname", "isdir", "join"))
     assert_fix(
         [
             "from os.path import (\n",
