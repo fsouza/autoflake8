@@ -13,12 +13,13 @@ def version():
                 return ast.parse(line).body[0].value.s
 
 
-with open("README.rst") as readme:
+with open("README.md") as readme:
     setuptools.setup(
         name="autoflake",
         version=version(),
         description="Removes unused imports and unused variables",
         long_description=readme.read(),
+        long_description_content_type="test/markdown",
         license="Expat License",
         author="Steven Myint",
         url="https://github.com/myint/autoflake",
@@ -26,7 +27,6 @@ with open("README.rst") as readme:
             "Environment :: Console",
             "Intended Audience :: Developers",
             "License :: OSI Approved :: MIT License",
-            "Programming Language :: Python :: 2.7",
             "Programming Language :: Python :: 3",
             "Topic :: Software Development :: Quality Assurance",
         ],
