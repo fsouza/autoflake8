@@ -44,8 +44,12 @@ def pyflakes_count(filename: str) -> int:
 
 def readlines(filename: str) -> Sequence[str]:
     """Return contents of file as a list of lines."""
-    with open(filename) as f:
-        return f.readlines()
+    with open(filename, "rb") as f:
+        source = f.read()
+
+        return source.decode(
+            encoding=autoflake.detect_source_encoding(source),
+        ).splitlines(keepends=True)
 
 
 def diff(before: str, after: str) -> str:
@@ -221,7 +225,7 @@ def check(args: argparse.Namespace) -> bool:
     filenames = dir_paths
     completed_filenames = set()
 
-    files_to_skip = {"bad_coding.py"}
+    files_to_skip = {"bad_coding.py", "badsyntax_pep3120.py"}
 
     while filenames:
         name = os.path.realpath(filenames.pop(0))
