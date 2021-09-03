@@ -1,12 +1,16 @@
 """Test suite for autoflake."""
 import os
+import pathlib
 import re
-import shutil
 import subprocess
-import tempfile
+from contextlib import _GeneratorContextManager
+from typing import Callable
+from typing import Iterable
+from typing import List
+
+import pytest
 
 import autoflake
-import pytest
 
 
 def test_unused_import_line_numbers() -> None:
@@ -295,26 +299,6 @@ x = 1
     assert result == expected
 
 
-def test_filter_code_with_additional_imports() -> None:
-    result = "".join(
-        autoflake.filter_code(
-            """\
-import foo
-import zap
-x = 1
-""",
-        ),
-    )
-
-    expected = """\
-pass
-import zap
-x = 1
-"""
-
-    assert result == expected
-
-
 def test_filter_code_should_ignore_imports_with_inline_comment() -> None:
     result = "".join(
         autoflake.filter_code(
@@ -449,7 +433,7 @@ print(a)
 
 
 @pytest.mark.parametrize(
-    ("line", "expected"),
+    ("line", "previous_line", "expected"),
     [
         pytest.param(
             r"""\
@@ -478,6 +462,7 @@ import os, math, subprocess
         ),
         pytest.param(
             "from os import (path, sep)" "",
+            "",
             True,
             id="parens",
         ),
@@ -513,7 +498,7 @@ def test_multiline_statement(line: str, previous_line: str, expected: bool) -> N
         ),
         pytest.param(
             "    import abc, subprocess, math\n",
-            "import abc\nimport math\nimport subprocess\n",
+            "    import abc\n    import math\n    import subprocess\n",
             id="with indentation",
         ),
         pytest.param(
@@ -534,7 +519,7 @@ def test_filter_from_import_no_remove() -> None:
     )
 
     expected = """\
-from foo import abc, math, subprocess\n"""
+    from foo import abc, math, subprocess\n"""
 
     assert result == expected
 
@@ -546,7 +531,7 @@ def test_filter_from_import_remove_module() -> None:
     )
 
     expected = """\
-from foo import math, subprocess\n"""
+    from foo import math, subprocess\n"""
 
     assert result == expected
 
@@ -1127,344 +1112,344 @@ def test_useless_pass_line_numbers_with_escaped_newline() -> None:
 
 
 def test_useless_pass_line_numbers_with_more_complex() -> None:
-    self.assertEqual(
-        [6],
-        list(
-            autoflake.useless_pass_line_numbers(
-                """\
+    result = list(
+        autoflake.useless_pass_line_numbers(
+            """\
 if True:
-pass
+    pass
 else:
-True
-x = 1
-pass
+    True
+    x = 1
+    pass
 """,
-            ),
         ),
     )
+
+    assert result == [6]
 
 
 def test_filter_useless_pass() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 if True:
-pass
+    pass
 else:
-True
-x = 1
+    True
+    x = 1
+    pass
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-if True:
-pass
-else:
-True
-x = 1
-pass
-""",
-            ),
         ),
     )
+
+    expected = """\
+if True:
+    pass
+else:
+    True
+    x = 1
+"""
+
+    assert result == expected
 
 
 def test_filter_useless_pass_with_syntax_error() -> None:
     source = """\
 if True:
 if True:
-        if True:
+            if True:
+    if True:
 if True:
-
-if True:
-pass
+    pass
 else:
-True
-pass
-pass
-x = 1
+    True
+    pass
+    pass
+    x = 1
 """
 
     assert "".join(autoflake.filter_useless_pass(source)) == source
 
 
 def test_filter_useless_pass_more_complex() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 if True:
-pass
+    pass
 else:
-def foo():
+    def foo():
+        pass
+        # abc
+    def bar():
+        # abc
+        pass
+    def blah():
+        123
+        pass
+        pass  # Nope.
+        pass
+    True
+    x = 1
     pass
-    # abc
-def bar():
-    # abc
-    pass
-def blah():
-    123
-    pass  # Nope.
-True
-x = 1
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-if True:
-pass
-else:
-def foo():
-    pass
-    # abc
-def bar():
-    # abc
-    pass
-def blah():
-    123
-    pass
-    pass  # Nope.
-    pass
-True
-x = 1
-pass
-""",
-            ),
         ),
     )
+
+    expected = """\
+if True:
+    pass
+else:
+    def foo():
+        pass
+        # abc
+    def bar():
+        # abc
+        pass
+    def blah():
+        123
+        pass  # Nope.
+    True
+    x = 1
+"""
+
+    assert result == expected
 
 
 def test_filter_useless_pass_with_try() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 import os
 os.foo()
 try:
-pass
+    pass
+    pass
 except ImportError:
-pass
+    pass
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-import os
-os.foo()
-try:
-pass
-pass
-except ImportError:
-pass
-""",
-            ),
         ),
     )
+
+    expected = """\
+import os
+os.foo()
+try:
+    pass
+except ImportError:
+    pass
+"""
+
+    assert result == expected
 
 
 def test_filter_useless_pass_leading_pass() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 if True:
-pass
+    pass
+    pass
+    pass
+    pass
 else:
-True
-x = 1
+    pass
+    True
+    x = 1
+    pass
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-if True:
-pass
-pass
-pass
-pass
-else:
-pass
-True
-x = 1
-pass
-""",
-            ),
         ),
     )
+
+    expected = """\
+if True:
+    pass
+else:
+    True
+    x = 1
+"""
+
+    assert result == expected
 
 
 def test_filter_useless_pass_leading_pass_with_number() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 def func11():
-0, 11 / 2
-return 1
+    pass
+    0, 11 / 2
+    return 1
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-def func11():
-pass
-0, 11 / 2
-return 1
-""",
-            ),
         ),
     )
+
+    expected = """\
+def func11():
+    0, 11 / 2
+    return 1
+"""
+
+    assert result == expected
 
 
 def test_filter_useless_pass_leading_pass_with_string() -> None:
-    self.assertEqual(
-        """\
+    result = "".join(
+        autoflake.filter_useless_pass(
+            """\
 def func11():
-'hello'
-return 1
+    pass
+    'hello'
+    return 1
 """,
-        "".join(
-            autoflake.filter_useless_pass(
-                """\
-def func11():
-pass
-'hello'
-return 1
-""",
-            ),
         ),
     )
+
+    expected = """\
+def func11():
+    'hello'
+    return 1
+"""
+
+    assert result == expected
 
 
 def test_check() -> None:
-    self.assertTrue(autoflake.check("import os"))
+    assert autoflake.check("import os")
 
 
 def test_check_with_bad_syntax() -> None:
-    self.assertFalse(autoflake.check("foo("))
+    assert autoflake.check("foo(") == []
 
 
 def test_check_with_unicode() -> None:
-    self.assertFalse(autoflake.check('print("∑")'))
+    assert autoflake.check('print("∑")') == []
 
-    self.assertTrue(autoflake.check("import os  # ∑"))
+    assert autoflake.check("import os  # ∑")
 
 
 def test_get_diff_text() -> None:
-    # We ignore the first two lines since it differs on Python 2.6.
-    self.assertEqual(
-        """\
+    result = "\n".join(
+        autoflake.get_diff_text(["foo\n"], ["bar\n"], "").split("\n")[3:],
+    )
+
+    expected = """\
 -foo
 +bar
-""",
-        "\n".join(
-            autoflake.get_diff_text(["foo\n"], ["bar\n"], "").split("\n")[3:],
-        ),
-    )
+"""
+
+    assert result == expected
 
 
 def test_get_diff_text_without_newline() -> None:
-    # We ignore the first two lines since it differs on Python 2.6.
-    self.assertEqual(
-        """\
+    result = "\n".join(autoflake.get_diff_text(["foo"], ["foo\n"], "").split("\n")[3:])
+
+    expected = """\
 -foo
 \\ No newline at end of file
 +foo
-""",
-        "\n".join(autoflake.get_diff_text(["foo"], ["foo\n"], "").split("\n")[3:]),
-    )
+"""
+
+    assert result == expected
 
 
 def test_is_literal_or_name() -> None:
-    self.assertTrue(autoflake.is_literal_or_name("123"))
-    self.assertTrue(autoflake.is_literal_or_name("[1, 2, 3]"))
-    self.assertTrue(autoflake.is_literal_or_name("xyz"))
+    assert autoflake.is_literal_or_name("123") is True
+    assert autoflake.is_literal_or_name("[1, 2, 3]") is True
+    assert autoflake.is_literal_or_name("xyz") is True
 
-    self.assertFalse(autoflake.is_literal_or_name("xyz.prop"))
-    self.assertFalse(autoflake.is_literal_or_name(" "))
-    self.assertFalse(autoflake.is_literal_or_name(" 1"))
+    assert autoflake.is_literal_or_name("xyz.prop") is False
+    assert autoflake.is_literal_or_name(" ") is False
+    assert autoflake.is_literal_or_name(" 1") is False
 
 
-def test_is_python_file() -> None:
-    self.assertTrue(
-        autoflake.is_python_file(os.path.join(ROOT_DIRECTORY, "autoflake.py")),
-    )
+def test_is_python_file(
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
+    root_dir: pathlib.Path,
+) -> None:
+    assert autoflake.is_python_file(str(root_dir / "autoflake.py")) is True
 
     with temporary_file("#!/usr/bin/env python", suffix="") as filename:
-        self.assertTrue(autoflake.is_python_file(filename))
+        assert autoflake.is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/python", suffix="") as filename:
-        self.assertTrue(autoflake.is_python_file(filename))
+        assert autoflake.is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/python3", suffix="") as filename:
-        self.assertTrue(autoflake.is_python_file(filename))
+        assert autoflake.is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/pythonic", suffix="") as filename:
-        self.assertFalse(autoflake.is_python_file(filename))
+        assert autoflake.is_python_file(filename) is False
 
     with temporary_file("###!/usr/bin/python", suffix="") as filename:
-        self.assertFalse(autoflake.is_python_file(filename))
+        assert autoflake.is_python_file(filename) is False
 
-    self.assertFalse(autoflake.is_python_file(os.devnull))
-    self.assertFalse(autoflake.is_python_file("/bin/bash"))
-
-
-def test_is_exclude_file() -> None:
-    self.assertTrue(autoflake.is_exclude_file("1.py", ["test*", "1*"]))
-
-    self.assertFalse(autoflake.is_exclude_file("2.py", ["test*", "1*"]))
-
-    # folder glob
-    self.assertTrue(autoflake.is_exclude_file("test/test.py", ["test/**.py"]))
-
-    self.assertTrue(
-        autoflake.is_exclude_file("test/auto_test.py", ["test/*_test.py"]),
-    )
-
-    self.assertFalse(
-        autoflake.is_exclude_file("test/auto_auto.py", ["test/*_test.py"]),
-    )
+    assert autoflake.is_python_file(os.devnull) is False
+    assert autoflake.is_python_file("/bin/bash") is False
 
 
-def test_match_file() -> None:
+@pytest.mark.parametrize(
+    ("filename", "exclude", "expected"),
+    [
+        ("1.py", ["test*", "1*"], True),
+        ("2.py", ["test*", "1*"], False),
+        ("test/test.py", ["test/**.py"], True),
+        ("test/auto_test.py", ["test/*_test.py"], True),
+        ("test/auto_auto.py", ["test/*_test.py"], False),
+    ],
+)
+def test_is_exclude_file(filename: str, exclude: Iterable[str], expected: bool) -> None:
+    assert autoflake.is_exclude_file(filename, exclude) is expected
+
+
+def test_match_file(
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
+) -> None:
     with temporary_file("", suffix=".py", prefix=".") as filename:
-        self.assertFalse(autoflake.match_file(filename, exclude=[]), msg=filename)
+        assert autoflake.match_file(filename, exclude=[]) is False
 
-    self.assertFalse(autoflake.match_file(os.devnull, exclude=[]))
+    assert autoflake.match_file(os.devnull, exclude=[]) is False
 
     with temporary_file("", suffix=".py", prefix="") as filename:
-        self.assertTrue(autoflake.match_file(filename, exclude=[]), msg=filename)
+        assert autoflake.match_file(filename, exclude=[]) is True
 
 
-def test_find_files() -> None:
-    temp_directory = tempfile.mkdtemp()
+def test_find_files(tmp_path: pathlib.Path) -> None:
+    target = tmp_path / "dir"
+    target.mkdir(parents=True)
+
+    (target / "a.py").write_text("")
+
+    exclude = target / "ex"
+    exclude.mkdir()
+    (exclude / "b.py").write_text("")
+
+    sub = exclude / "sub"
+    sub.mkdir()
+    (sub / "c.py").write_text("")
+
+    cwd = pathlib.Path.cwd()
+
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
     try:
-        target = os.path.join(temp_directory, "dir")
-        os.mkdir(target)
-        with open(os.path.join(target, "a.py"), "w"):
-            pass
-
-        exclude = os.path.join(target, "ex")
-        os.mkdir(exclude)
-        with open(os.path.join(exclude, "b.py"), "w"):
-            pass
-
-        sub = os.path.join(exclude, "sub")
-        os.mkdir(sub)
-        with open(os.path.join(sub, "c.py"), "w"):
-            pass
-
-        # FIXME: Avoid changing directory. This may interfere with parallel
-        # test runs.
-        cwd = os.getcwd()
-        os.chdir(temp_directory)
-        try:
-            files = list(
-                autoflake.find_files(["dir"], True, [os.path.join("dir", "ex")]),
-            )
-        finally:
-            os.chdir(cwd)
-
-        file_names = [os.path.basename(f) for f in files]
-        self.assertIn("a.py", file_names)
-        self.assertNotIn("b.py", file_names)
-        self.assertNotIn("c.py", file_names)
+        files = list(
+            autoflake.find_files(["dir"], True, [str(exclude)]),
+        )
     finally:
-        shutil.rmtree(temp_directory)
+        os.chdir(cwd)
+
+    file_names = [os.path.basename(f) for f in files]
+    assert "a.py" in file_names
+    assert "b.py" in file_names
+    assert "c.py" in file_names
 
 
-def test_exclude() -> None:
-    temp_directory = tempfile.mkdtemp(dir=".")
-    try:
+def test_exclude(
+    autoflake8_command: List[str],
+    temporary_directory: Callable[..., _GeneratorContextManager[str]],
+) -> None:
+    with temporary_directory(directory=".") as temp_directory:
         with open(os.path.join(temp_directory, "a.py"), "w") as output:
             output.write("import re\n")
 
@@ -1473,12 +1458,11 @@ def test_exclude() -> None:
             output.write("import os\n")
 
         p = subprocess.Popen(
-            list(AUTOFLAKE_COMMAND) + [temp_directory, "--recursive", "--exclude=a*"],
+            autoflake8_command + [temp_directory, "--recursive", "--exclude=a*"],
             stdout=subprocess.PIPE,
         )
-        result = p.communicate()[0].decode("utf-8")
+        stdout, _ = p.communicate()
+        result = stdout.decode("utf-8")
 
-        self.assertNotIn("import re", result)
-        self.assertIn("import os", result)
-    finally:
-        shutil.rmtree(temp_directory)
+        assert "import re" not in result
+        assert "import os" in result

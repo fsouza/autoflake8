@@ -993,7 +993,7 @@ def _main(
     parser.add_argument(
         "--exclude",
         metavar="globs",
-        help="exclude file/directory names that match these " "comma-separated globs",
+        help="exclude file/directory names that match these comma-separated globs",
     )
     parser.add_argument(
         "--expand-star-imports",
