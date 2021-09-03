@@ -38,7 +38,7 @@ def colored(text, color):
 
 def pyflakes_count(filename: str) -> int:
     """Return pyflakes error count."""
-    with open(filename) as f:
+    with open(filename, "rb") as f:
         return len(list(autoflake.check(f.read())))
 
 

@@ -68,6 +68,6 @@ def autoflake8_command(root_dir: pathlib.Path) -> List[str]:
 
 
 @pytest.fixture
-def devnull() -> Iterator[IO[str]]:
-    with open(os.devnull, "r+") as f:
+def devnull() -> Iterator[IO[bytes]]:
+    with open(os.devnull, "rb+") as f:
         yield f

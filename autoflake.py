@@ -24,7 +24,6 @@ import argparse
 import ast
 import collections
 import difflib
-import distutils.sysconfig
 import fnmatch
 import io
 import logging
@@ -35,7 +34,6 @@ import string
 import sys
 import tempfile
 import tokenize
-from typing import Any
 from typing import Dict
 from typing import IO
 from typing import Iterable
@@ -63,41 +61,42 @@ ATOMS = frozenset([tokenize.NAME, tokenize.NUMBER, tokenize.STRING])
 
 
 class Regex:
-    BASE_MODULE = re.compile(r"\bfrom\s+([^ ]+)")
-    DEL = re.compile(r"\bdel\b")
-    DUNDER_ALL = re.compile(r"\b__all__\b")
-    EXCEPT = re.compile(r"^\s*except [\s,()\w]+ as \w+:$")
-    INDENTATION = re.compile(r"^\s*")
+    BASE_MODULE = re.compile(rb"\bfrom\s+([^ ]+)")
+    DEL = re.compile(rb"\bdel\b")
+    DUNDER_ALL = re.compile(rb"\b__all__\b")
+    EXCEPT = re.compile(rb"^\s*except [\s,()\w]+ as \w+:$")
+    INDENTATION = re.compile(rb"^\s*")
     PYTHON_SHEBANG = re.compile(rb"^#!.*\bpython3?\b\s*$")
-    STAR = re.compile(r"\*")
+    STAR = re.compile(rb"\*")
+    IMPORT = re.compile(rb"\bimport\b\s*")
+    CODING = re.compile(rb"^[ \t\f]*#.*?coding[:=][ \t]*([-_.a-zA-Z0-9]+)")
 
 
-def standard_paths() -> Iterator[str]:
-    """Yield paths to standard modules."""
-    for is_plat_spec in [True, False]:
-        # Yield lib paths.
-        path = distutils.sysconfig.get_python_lib(
-            standard_lib=True,
-            plat_specific=is_plat_spec,
-        )
-        yield from os.listdir(path)
+class LogStreamAdapter:
+    def __init__(self, stream: IO[bytes]) -> None:
+        self.stream = stream
 
-        # Yield lib-dynload paths.
-        dynload_path = os.path.join(path, "lib-dynload")
-        if os.path.isdir(dynload_path):
-            yield from os.listdir(dynload_path)
+    def write(self, v: str) -> int:
+        return self.stream.write(v.encode())
+
+    def flush(self) -> None:
+        self.stream.flush()
 
 
-def standard_package_names() -> Iterator[str]:
-    """Yield standard module names."""
-    for name in standard_paths():
-        if name.startswith("_") or "-" in name:
-            continue
+whitespace = string.whitespace.encode()
 
-        if "." in name and not name.endswith(("so", "py", "pyc")):
-            continue
 
-        yield name.split(".")[0]
+def detect_source_encoding(source: bytes) -> str:
+    """
+    See PEP-263 for details.
+    """
+    lines = source.splitlines()[:2]
+    for line in lines:
+        m = Regex.CODING.match(line)
+        if m is not None:
+            return m.group(1).decode()
+
+    return "utf-8"
 
 
 def unused_import_line_numbers(
@@ -111,7 +110,7 @@ def unused_import_line_numbers(
 
 def unused_import_module_name(
     messages: Iterable[pyflakes.messages.Message],
-) -> Iterator[Tuple[int, str]]:
+) -> Iterator[Tuple[int, bytes]]:
     """Yield line number and module name of unused imports."""
     regex = re.compile("'(.+?)'")
     for message in messages:
@@ -119,7 +118,7 @@ def unused_import_module_name(
             module_name = regex.search(str(message))
             if module_name:
                 module_name = module_name.group()[1:-1]
-                yield (message.lineno, module_name)
+                yield (message.lineno, module_name.encode())
 
 
 def star_import_used_line_numbers(
@@ -133,13 +132,13 @@ def star_import_used_line_numbers(
 
 def star_import_usage_undefined_name(
     messages: Iterable[pyflakes.messages.Message],
-) -> Iterator[Tuple[int, str, str]]:
+) -> Iterator[Tuple[int, bytes, bytes]]:
     """Yield line number, undefined name, and its possible origin module."""
     for message in messages:
         if isinstance(message, pyflakes.messages.ImportStarUsage):
             undefined_name = message.message_args[0]
             module_name = message.message_args[1]
-            yield (message.lineno, undefined_name, module_name)
+            yield (message.lineno, undefined_name.encode(), module_name.encode())
 
 
 def unused_variable_line_numbers(
@@ -153,7 +152,7 @@ def unused_variable_line_numbers(
 
 def duplicate_key_line_numbers(
     messages: Iterable[pyflakes.messages.Message],
-    source: str,
+    source: bytes,
 ) -> Iterator[int]:
     """Yield line numbers of duplicate keys."""
     target_messages = [
@@ -168,7 +167,7 @@ def duplicate_key_line_numbers(
 
         key_to_messages = create_key_to_messages_dict(target_messages)
 
-        lines = source.split("\n")
+        lines = source.split(b"\n")
 
         for (key, messages) in key_to_messages.items():
             good = True
@@ -194,7 +193,7 @@ def create_key_to_messages_dict(
     return dictionary
 
 
-def check(source: str) -> Iterable[pyflakes.messages.Message]:
+def check(source: bytes) -> Iterable[pyflakes.messages.Message]:
     """Return messages from pyflakes."""
     reporter = ListReporter()
     try:
@@ -228,44 +227,25 @@ class ListReporter(pyflakes.reporter.Reporter):
         self.messages.append(message)
 
 
-def extract_package_name(line: str) -> Optional[str]:
-    """Return package name in import statement."""
-    assert "\\" not in line
-    assert "(" not in line
-    assert ")" not in line
-    assert ";" not in line
-
-    if line.lstrip().startswith(("import", "from")):
-        word = line.split()[1]
-    else:
-        # Ignore doctests.
-        return None
-
-    package = word.split(".")[0]
-    assert " " not in package
-
-    return package
-
-
-def is_multiline_import(line: str, previous_line: str = "") -> bool:
+def is_multiline_import(line: bytes, previous_line: bytes = b"") -> bool:
     """Return True if import is spans multiples lines."""
-    for symbol in "()":
+    for symbol in b"()":
         if symbol in line:
             return True
 
     return is_multiline_statement(line, previous_line)
 
 
-def is_multiline_statement(line: str, previous_line: str = "") -> bool:
+def is_multiline_statement(line: bytes, previous_line: bytes = b"") -> bool:
     """Return True if this is part of a multiline statement."""
-    for symbol in "\\:;":
+    for symbol in b"\\:;":
         if symbol in line:
             return True
 
-    sio = io.StringIO(line)
+    sio = io.StringIO(line.decode())
     try:
         list(tokenize.generate_tokens(sio.readline))
-        return previous_line.rstrip().endswith("\\")
+        return previous_line.rstrip().endswith(b"\\")
     except (SyntaxError, tokenize.TokenError):
         return True
 
@@ -278,11 +258,11 @@ class PendingFix:
     with the following line.
     """
 
-    def __init__(self, line: str) -> None:
+    def __init__(self, line: bytes) -> None:
         """Analyse and store the first line."""
         self.accumulator = collections.deque([line])
 
-    def __call__(self, line: str) -> object:
+    def __call__(self, line: bytes) -> object:
         """Process line considering the accumulator.
 
         Return self to keep processing the following lines or a string
@@ -291,9 +271,9 @@ class PendingFix:
         raise NotImplementedError("Abstract method needs to be overwritten")
 
 
-def _valid_char_in_line(char: str, line: str) -> bool:
+def _valid_char_in_line(char: bytes, line: bytes) -> bool:
     """Return True if a char appears in the line and is not commented."""
-    comment_index = line.find("#")
+    comment_index = line.find(b"#")
     char_index = line.find(char)
     valid_char_in_line = char_index >= 0 and (
         comment_index > char_index or comment_index < 0
@@ -301,7 +281,7 @@ def _valid_char_in_line(char: str, line: str) -> bool:
     return valid_char_in_line
 
 
-def _segment_module(segment: str) -> str:
+def _segment_module(segment: bytes) -> bytes:
     """Extract the module identifier inside the segment.
 
     It might be the case the segment does not have a module (e.g. is composed
@@ -310,7 +290,7 @@ def _segment_module(segment: str) -> str:
     identifiers, so they will never be contained in the list of unused modules
     anyway.
     """
-    return segment.strip(string.whitespace + ",\\()") or segment
+    return segment.strip(whitespace + b",\\()") or segment
 
 
 class FilterMultilineImport(PendingFix):
@@ -322,26 +302,25 @@ class FilterMultilineImport(PendingFix):
     etc). In these cases, the statement is left unchanged to avoid problems.
     """
 
-    IMPORT_RE = re.compile(r"\bimport\b\s*")
-    BASE_RE = re.compile(r"\bfrom\s+([^ ]+)")
-    SEGMENT_RE = re.compile(r"([^,\s]+(?:[\s\\]+as[\s\\]+[^,\s]+)?[,\s\\)]*)", re.M)
-    IDENTIFIER_RE = re.compile(r"[^,\s]+")
+    BASE_RE = re.compile(rb"\bfrom\s+([^ ]+)")
+    SEGMENT_RE = re.compile(rb"([^,\s]+(?:[\s\\]+as[\s\\]+[^,\s]+)?[,\s\\)]*)", re.M)
+    IDENTIFIER_RE = re.compile(rb"[^,\s]+")
 
     def __init__(
         self,
-        line: str,
-        unused_module: Tuple[str, ...] = (),
-        previous_line: str = "",
+        line: bytes,
+        unused_module: Tuple[bytes, ...] = (),
+        previous_line: bytes = b"",
     ):
         """Receive the same parameters as ``filter_unused_import``."""
         self.remove = unused_module
-        self.parenthesized = "(" in line
-        self.from_, imports = self.IMPORT_RE.split(line, maxsplit=1)
+        self.parenthesized = b"(" in line
+        self.from_, imports = Regex.IMPORT.split(line, maxsplit=1)
         match = self.BASE_RE.search(self.from_)
         self.base = match.group(1) if match else None
         self.give_up = False
 
-        if "\\" in previous_line:
+        if b"\\" in previous_line:
             # Ignore tricky things like "try: \<new line> import" ...
             self.give_up = True
 
@@ -349,23 +328,23 @@ class FilterMultilineImport(PendingFix):
 
         PendingFix.__init__(self, imports)
 
-    def is_over(self, line: Optional[str] = None) -> bool:
+    def is_over(self, line: Optional[bytes] = None) -> bool:
         """Return True if the multiline import statement is over."""
         line = line or self.accumulator[-1]
 
         if self.parenthesized:
-            return _valid_char_in_line(")", line)
+            return _valid_char_in_line(b")", line)
 
-        return not _valid_char_in_line("\\", line)
+        return not _valid_char_in_line(b"\\", line)
 
-    def analyze(self, line: str) -> None:
+    def analyze(self, line: bytes) -> None:
         """Decide if the statement will be fixed or left unchanged."""
-        if any(ch in line for ch in ";:#"):
+        if any(ch in line for ch in b";:#"):
             self.give_up = True
 
-    def fix(self, accumulated: Iterable[str]) -> str:
+    def fix(self, accumulated: Iterable[bytes]) -> bytes:
         """Given a collection of accumulated lines, fix the entire import."""
-        old_imports = "".join(accumulated)
+        old_imports = b"".join(accumulated)
         ending = get_line_ending(old_imports)
         # Split imports into segments that contain the module name +
         # comma + whitespace and eventual <newline> \ ( ) chars
@@ -375,9 +354,9 @@ class FilterMultilineImport(PendingFix):
 
         # Short-circuit if no import was discarded
         if len(keep) == len(segments):
-            return self.from_ + "import " + "".join(accumulated)
+            return self.from_ + b"import " + b"".join(accumulated)
 
-        fixed = ""
+        fixed = b""
         if keep:
             # Since it is very difficult to deal with all the line breaks and
             # continuations, let's use the code layout that already exists and
@@ -387,29 +366,29 @@ class FilterMultilineImport(PendingFix):
             templates = templates[: len(keep) - 1] + templates[-1:]
             # It is important to keep the last segment, since it might contain
             # important chars like `)`
-            fixed = "".join(
+            fixed = b"".join(
                 template.replace(module, keep[i])
                 for i, (module, template) in enumerate(templates)
             )
 
             # Fix the edge case: inline parenthesis + just one surviving import
-            if self.parenthesized and any(ch not in fixed for ch in "()"):
-                fixed = fixed.strip(string.whitespace + "()") + ending
+            if self.parenthesized and any(ch not in fixed for ch in b"()"):
+                fixed = fixed.strip(whitespace + b"()") + ending
 
         # Replace empty imports with a "pass" statement
-        empty = len(fixed.strip(string.whitespace + "\\(),")) < 1
+        empty = len(fixed.strip(whitespace + b"\\(),")) < 1
         if empty:
             indentation_match = Regex.INDENTATION.search(self.from_)
             if indentation_match:
                 indentation = indentation_match.group(0)
-                return indentation + "pass" + ending
+                return indentation + b"pass" + ending
 
-        return self.from_ + "import " + fixed
+        return self.from_ + b"import " + fixed
 
     def __call__(
         self,
-        line: Optional[str] = None,
-    ) -> Union[str, "FilterMultilineImport"]:
+        line: Optional[bytes] = None,
+    ) -> Union[bytes, "FilterMultilineImport"]:
         """Accumulate all the lines in the import and then trigger the fix."""
         if line:
             self.accumulator.append(line)
@@ -417,94 +396,94 @@ class FilterMultilineImport(PendingFix):
         if not self.is_over(line):
             return self
         if self.give_up:
-            return self.from_ + "import " + "".join(self.accumulator)
+            return self.from_ + b"import " + b"".join(self.accumulator)
 
         return self.fix(self.accumulator)
 
 
 def _filter_imports(
-    imports: Iterable[str],
-    parent: Optional[str] = None,
-    unused_module: Tuple[str, ...] = (),
-) -> Sequence[str]:
+    imports: Iterable[bytes],
+    parent: Optional[bytes] = None,
+    unused_module: Tuple[bytes, ...] = (),
+) -> Sequence[bytes]:
     # We compare full module name (``a.module`` not `module`) to
     # guarantee the exact same module as detected from pyflakes.
-    sep = "" if parent and parent[-1] == "." else "."
+    sep = b"" if parent and parent.endswith(b".") else b"."
 
-    def full_name(name: str):
+    def full_name(name: bytes):
         return name if parent is None else parent + sep + name
 
     return [x for x in imports if full_name(x) not in unused_module]
 
 
-def filter_from_import(line: str, unused_module: Tuple[str, ...]) -> str:
+def filter_from_import(line: bytes, unused_module: Tuple[bytes, ...]) -> bytes:
     """
     Parse and filter ``from something import a, b, c``.
 
     Return line without unused import modules, or `pass` if all of the
     module in import is unused.
     """
-    (indentation, imports) = re.split(pattern=r"\bimport\b", string=line, maxsplit=1)
+    (indentation, imports) = re.split(pattern=rb"\bimport\b", string=line, maxsplit=1)
     base_module_match = Regex.BASE_MODULE.search(indentation)
     if base_module_match:
         base_module = base_module_match.group(1)
     else:
         base_module = None
 
-    imports = re.split(pattern=r"\s*,\s*", string=imports.strip())
+    imports = re.split(pattern=rb"\s*,\s*", string=imports.strip())
     filtered_imports = _filter_imports(imports, base_module, unused_module)
 
     # All of the import in this statement is unused
     if not filtered_imports:
-        return get_indentation(line) + "pass" + get_line_ending(line)
+        return get_indentation(line) + b"pass" + get_line_ending(line)
 
-    indentation += "import "
+    indentation += b"import "
 
-    return indentation + ", ".join(sorted(filtered_imports)) + get_line_ending(line)
+    return indentation + b", ".join(sorted(filtered_imports)) + get_line_ending(line)
 
 
-def break_up_import(line: str) -> str:
+def break_up_import(line: bytes) -> bytes:
     """Return line with imports on separate lines."""
-    assert "\\" not in line
-    assert "(" not in line
-    assert ")" not in line
-    assert ";" not in line
-    assert "#" not in line
-    assert not line.lstrip().startswith("from")
+    assert b"\\" not in line
+    assert b"(" not in line
+    assert b")" not in line
+    assert b";" not in line
+    assert b"#" not in line
+    assert not line.lstrip().startswith(b"from")
 
     newline = get_line_ending(line)
     if not newline:
         return line
 
-    (indentation, imports) = re.split(pattern=r"\bimport\b", string=line, maxsplit=1)
+    (indentation, imports) = re.split(pattern=rb"\bimport\b", string=line, maxsplit=1)
 
-    indentation += "import "
+    indentation += b"import "
     assert newline
 
-    return "".join(
-        [indentation + i.strip() + newline for i in sorted(imports.split(","))],
+    return b"".join(
+        [indentation + i.strip() + newline for i in sorted(imports.split(b","))],
     )
 
 
 def filter_code(
-    source: str,
+    source: bytes,
     expand_star_imports: bool = False,
     remove_duplicate_keys: bool = False,
     remove_unused_variables: bool = False,
-) -> Iterator[str]:
+) -> Iterator[bytes]:
     """Yield code with unused imports removed."""
     messages = check(source)
 
     marked_import_line_numbers = frozenset(unused_import_line_numbers(messages))
-    marked_unused_module: Dict[int, List[str]] = collections.defaultdict(lambda: [])
+    marked_unused_module: Dict[int, List[bytes]] = collections.defaultdict(lambda: [])
     for line_number, module_name in unused_import_module_name(messages):
         marked_unused_module[line_number].append(module_name)
 
     undefined_names = []
     if expand_star_imports and not (
         # See explanations in #18.
-        re.search(r"\b__all__\b", source)
-        or re.search(r"\bdel\b", source)
+        Regex.DUNDER_ALL.search(source)
+        or Regex.DEL.search(source)
     ):
         marked_star_import_line_numbers = frozenset(
             star_import_used_line_numbers(messages),
@@ -534,13 +513,12 @@ def filter_code(
     else:
         marked_key_line_numbers = frozenset()
 
-    sio = io.StringIO(source)
-    previous_line = ""
+    previous_line = b""
     result = None
-    for line_number, line in enumerate(sio.readlines(), start=1):
+    for line_number, line in enumerate(source.splitlines(keepends=True), start=1):
         if isinstance(result, PendingFix):
             result = result(line)
-        elif "#" in line:
+        elif b"#" in line:
             result = line
         elif line_number in marked_import_line_numbers:
             result = filter_unused_import(
@@ -561,7 +539,7 @@ def filter_code(
         else:
             result = line
 
-        if isinstance(result, str):
+        if isinstance(result, bytes):
             yield result
 
         previous_line = line
@@ -578,22 +556,22 @@ def group_messages_by_line(
 
 
 def filter_star_import(
-    line: str,
-    marked_star_import_undefined_name: Iterable[str],
-) -> str:
+    line: bytes,
+    marked_star_import_undefined_name: Iterable[bytes],
+) -> bytes:
     """Return line with the star import expanded."""
     undefined_name = sorted(set(marked_star_import_undefined_name))
-    return Regex.STAR.sub(", ".join(undefined_name), line)
+    return Regex.STAR.sub(b", ".join(undefined_name), line)
 
 
 def filter_unused_import(
-    line: str,
-    unused_module: Tuple[str, ...],
-    previous_line: str = "",
-) -> Union[str, PendingFix]:
+    line: bytes,
+    unused_module: Tuple[bytes, ...],
+    previous_line: bytes = b"",
+) -> Union[bytes, PendingFix]:
     """Return line if used, otherwise return None."""
     # Ignore doctests.
-    if line.lstrip().startswith(">"):
+    if line.lstrip().startswith(b">"):
         return line
 
     if is_multiline_import(line, previous_line):
@@ -604,12 +582,12 @@ def filter_unused_import(
         )
         return filt()
 
-    is_from_import = line.lstrip().startswith("from")
+    is_from_import = line.lstrip().startswith(b"from")
 
-    if "," in line and not is_from_import:
+    if b"," in line and not is_from_import:
         return break_up_import(line)
 
-    if "," in line:
+    if b"," in line:
         assert is_from_import
         return filter_from_import(line, unused_module)
     else:
@@ -617,26 +595,26 @@ def filter_unused_import(
         # only line inside a block. For example,
         # "if True:\n    import os". In such cases, if the import is
         # removed, the block will be left hanging with no body.
-        return get_indentation(line) + "pass" + get_line_ending(line)
+        return get_indentation(line) + b"pass" + get_line_ending(line)
 
 
-def filter_unused_variable(line: str, previous_line: str = "") -> str:
+def filter_unused_variable(line: bytes, previous_line: bytes = b"") -> bytes:
     """Return line if used, otherwise return None."""
     if re.match(Regex.EXCEPT, line):
-        return re.sub(r" as \w+:$", ":", line, count=1)
+        return re.sub(rb" as \w+:$", b":", line, count=1)
     elif is_multiline_statement(line, previous_line):
         return line
-    elif line.count("=") == 1:
-        split_line = line.split("=")
+    elif line.count(b"=") == 1:
+        split_line = line.split(b"=")
         assert len(split_line) == 2
         value = split_line[1].lstrip()
-        if "," in split_line[0]:
+        if b"," in split_line[0]:
             return line
 
         if is_literal_or_name(value):
             # Rather than removing the line, replace with it "pass" to avoid
             # a possible hanging block with no body.
-            value = "pass" + get_line_ending(line)
+            value = b"pass" + get_line_ending(line)
 
         return get_indentation(line) + value
     else:
@@ -644,18 +622,18 @@ def filter_unused_variable(line: str, previous_line: str = "") -> str:
 
 
 def filter_duplicate_key(
-    line: str,
+    line: bytes,
     line_number: int,
     marked_line_numbers: Iterable[int],
-) -> str:
+) -> bytes:
     """Return '' if first occurrence of the key otherwise return `line`."""
     if marked_line_numbers and line_number == sorted(marked_line_numbers)[0]:
-        return ""
+        return b""
 
     return line
 
 
-def dict_entry_has_key(line: str, key: Any) -> bool:
+def dict_entry_has_key(line: bytes, key: str) -> bool:
     """
     Return True if `line` is a dict entry that uses `key`.
 
@@ -663,15 +641,15 @@ def dict_entry_has_key(line: str, key: Any) -> bool:
     itself.
 
     """
-    if "#" in line:
+    if b"#" in line:
         return False
 
-    result = re.match(r"\s*(.*)\s*:\s*(.*),\s*$", line)
+    result = re.match(rb"\s*(.*)\s*:\s*(.*),\s*$", line)
     if not result:
         return False
 
     try:
-        candidate_key = ast.literal_eval(result.group(1))
+        candidate_key = ast.literal_eval(result.group(1).decode())
     except (SyntaxError, ValueError):
         return False
 
@@ -681,35 +659,35 @@ def dict_entry_has_key(line: str, key: Any) -> bool:
     return candidate_key == key
 
 
-def is_literal_or_name(value: str) -> bool:
+def is_literal_or_name(value: bytes) -> bool:
     """Return True if value is a literal or a name."""
     try:
-        ast.literal_eval(value)
+        ast.literal_eval(value.decode())
         return True
     except (SyntaxError, ValueError):
         pass
 
-    if value.strip() in ["dict()", "list()", "set()"]:
+    if value.strip() in [b"dict()", b"list()", b"set()"]:
         return True
 
     # Support removal of variables on the right side. But make sure
     # there are no dots, which could mean an access of a property.
-    return re.match(r"^\w+\s*$", value) is not None
+    return re.match(rb"^\w+\s*$", value) is not None
 
 
-def useless_pass_line_numbers(source: str) -> Iterator[int]:
+def useless_pass_line_numbers(source: bytes) -> Iterator[int]:
     """Yield line numbers of unneeded "pass" statements."""
-    sio = io.StringIO(source)
+    sio = io.StringIO(source.decode(encoding=detect_source_encoding(source)))
     previous_token_type = None
     last_pass_row = None
     last_pass_indentation = None
-    previous_line = ""
+    previous_line = b""
     for token in tokenize.generate_tokens(sio.readline):
         token_type = token[0]
         start_row = token[2][0]
-        line = token[4]
+        line = token[4].encode()
 
-        is_pass = token_type == tokenize.NAME and line.strip() == "pass"
+        is_pass = token_type == tokenize.NAME and line.strip() == b"pass"
 
         # Leading "pass".
         if (
@@ -728,7 +706,7 @@ def useless_pass_line_numbers(source: str) -> Iterator[int]:
         if (
             is_pass
             and previous_token_type != tokenize.INDENT
-            and not previous_line.rstrip().endswith("\\")
+            and not previous_line.rstrip().endswith(b"\\")
         ):
             yield start_row
 
@@ -736,56 +714,55 @@ def useless_pass_line_numbers(source: str) -> Iterator[int]:
         previous_line = line
 
 
-def filter_useless_pass(source: str) -> Iterator[str]:
+def filter_useless_pass(source: bytes) -> Iterator[bytes]:
     """Yield code with useless "pass" lines removed."""
     try:
         marked_lines = frozenset(useless_pass_line_numbers(source))
     except (SyntaxError, tokenize.TokenError):
         marked_lines = frozenset()
 
-    sio = io.StringIO(source)
-    for line_number, line in enumerate(sio.readlines(), start=1):
+    for line_number, line in enumerate(source.splitlines(keepends=True), start=1):
         if line_number not in marked_lines:
             yield line
 
 
-def get_indentation(line: str) -> str:
+def get_indentation(line: bytes) -> bytes:
     """Return leading whitespace."""
     if line.strip():
         non_whitespace_index = len(line) - len(line.lstrip())
         return line[:non_whitespace_index]
     else:
-        return ""
+        return b""
 
 
-def get_line_ending(line: str) -> str:
+def get_line_ending(line: bytes) -> bytes:
     """Return line ending."""
     non_whitespace_index = len(line.rstrip()) - len(line)
     if not non_whitespace_index:
-        return ""
+        return b""
     else:
         return line[non_whitespace_index:]
 
 
 def fix_code(
-    source: str,
+    source: bytes,
     expand_star_imports: bool = False,
     remove_duplicate_keys: bool = False,
     remove_unused_variables: bool = False,
-) -> str:
+) -> bytes:
     """Return code with all filtering run on it."""
     if not source:
         return source
 
     # pyflakes does not handle "nonlocal" correctly.
-    if "nonlocal" in source:
+    if b"nonlocal" in source:
         remove_unused_variables = False
 
     filtered_source = None
     while True:
-        filtered_source = "".join(
+        filtered_source = b"".join(
             filter_useless_pass(
-                "".join(
+                b"".join(
                     filter_code(
                         source,
                         expand_star_imports=expand_star_imports,
@@ -803,9 +780,9 @@ def fix_code(
     return filtered_source
 
 
-def fix_file(filename: str, args: argparse.Namespace, standard_out: IO[str]) -> None:
+def fix_file(filename: str, args: argparse.Namespace, standard_out: IO[bytes]) -> None:
     """Run fix_code() on a file."""
-    with open(filename, "r+") as input_file:
+    with open(filename, "rb+") as input_file:
         _fix_file(
             input_file,
             filename,
@@ -816,11 +793,11 @@ def fix_file(filename: str, args: argparse.Namespace, standard_out: IO[str]) -> 
 
 
 def _fix_file(
-    input_file: IO[str],
+    input_file: IO[bytes],
     filename: str,
     args: argparse.Namespace,
     write_to_stdout: bool,
-    standard_out: IO[str],
+    standard_out: IO[bytes],
 ) -> None:
     source = input_file.read()
     original_source = source
@@ -834,7 +811,9 @@ def _fix_file(
 
     if original_source != filtered_source:
         if args.check:
-            standard_out.write(f"{filename}: Unused imports/variables detected")
+            standard_out.write(
+                f"{filename}: Unused imports/variables detected".encode(),
+            )
             sys.exit(1)
         if write_to_stdout:
             standard_out.write(filtered_source)
@@ -843,22 +822,29 @@ def _fix_file(
                 delete=False,
                 dir=os.path.dirname(filename),
             ) as output_file:
-                output_file.write(filtered_source.encode())
+                output_file.write(filtered_source)
 
             os.rename(output_file.name, filename)
             _LOGGER.info(f"Fixed {filename}")
         else:
+            encoding = detect_source_encoding(original_source)
             diff = get_diff_text(
-                original_source.splitlines(keepends=True),
-                filtered_source.splitlines(keepends=True),
+                [
+                    line.decode(encoding=encoding)
+                    for line in original_source.splitlines(keepends=True)
+                ],
+                [
+                    line.decode(encoding=encoding)
+                    for line in filtered_source.splitlines(keepends=True)
+                ],
                 filename,
             )
-            standard_out.write("".join(diff))
+            standard_out.write(diff.encode())
     elif write_to_stdout:
         standard_out.write(filtered_source)
     else:
         if args.check:
-            standard_out.write("No issues detected!\n")
+            standard_out.write(b"No issues detected!\n")
         else:
             _LOGGER.debug("Clean %s: nothing to fix", filename)
 
@@ -967,9 +953,9 @@ def find_files(
 
 def _main(
     argv: Sequence[str],
-    stdout: IO[str],
-    stderr: IO[str],
-    stdin: IO[str],
+    stdout: IO[bytes],
+    stderr: IO[bytes],
+    stdin: IO[bytes],
 ) -> int:
     """
     Returns exit status.
@@ -1052,7 +1038,7 @@ def _main(
     if stderr is None:
         _LOGGER.addHandler(logging.NullHandler())
     else:
-        _LOGGER.addHandler(logging.StreamHandler(stderr))
+        _LOGGER.addHandler(logging.StreamHandler(LogStreamAdapter(stderr)))
         loglevels = [logging.WARNING, logging.INFO, logging.DEBUG]
         try:
             loglevel = loglevels[args.verbosity]
@@ -1097,9 +1083,9 @@ def main() -> int:
     try:
         return _main(
             sys.argv,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            stdin=sys.stdin,
+            stdout=sys.stdout.buffer,
+            stderr=sys.stderr.buffer,
+            stdin=sys.stdin.buffer,
         )
     except KeyboardInterrupt:
         return 2
