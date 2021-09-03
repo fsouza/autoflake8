@@ -14,7 +14,10 @@ import pytest
 
 
 @pytest.fixture
-def temporary_file() -> Callable[[str, str, str, str], _GeneratorContextManager[str]]:
+def temporary_file() -> Callable[
+    [str, str, str, str],
+    "_GeneratorContextManager[str]",
+]:
     @contextlib.contextmanager
     def _fn(
         contents: str,
@@ -39,7 +42,7 @@ def temporary_file() -> Callable[[str, str, str, str], _GeneratorContextManager[
 
 
 @pytest.fixture
-def temporary_directory() -> Callable[[str, str], _GeneratorContextManager[str]]:
+def temporary_directory() -> Callable[[str, str], "_GeneratorContextManager[str]"]:
     @contextlib.contextmanager
     def _fn(
         directory=".",

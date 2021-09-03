@@ -1364,7 +1364,7 @@ def test_is_literal_or_name() -> None:
 
 
 def test_is_python_file(
-    temporary_file: Callable[..., _GeneratorContextManager[str]],
+    temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     root_dir: pathlib.Path,
 ) -> None:
     assert autoflake.is_python_file(str(root_dir / "autoflake.py")) is True
@@ -1403,7 +1403,7 @@ def test_is_exclude_file(filename: str, exclude: Iterable[str], expected: bool) 
 
 
 def test_match_file(
-    temporary_file: Callable[..., _GeneratorContextManager[str]],
+    temporary_file: Callable[..., "_GeneratorContextManager[str]"],
 ) -> None:
     with temporary_file("", suffix=".py", prefix=".") as filename:
         assert autoflake.match_file(filename, exclude=[]) is False
@@ -1447,7 +1447,7 @@ def test_find_files(tmp_path: pathlib.Path) -> None:
 
 def test_exclude(
     autoflake8_command: List[str],
-    temporary_directory: Callable[..., _GeneratorContextManager[str]],
+    temporary_directory: Callable[..., "_GeneratorContextManager[str]"],
 ) -> None:
     with temporary_directory(directory=".") as temp_directory:
         with open(os.path.join(temp_directory, "a.py"), "w") as output:
