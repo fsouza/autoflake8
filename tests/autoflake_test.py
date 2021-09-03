@@ -8,8 +8,9 @@ from typing import Callable
 from typing import Iterable
 from typing import List
 
-import autoflake
 import pytest
+
+import autoflake
 
 
 @pytest.mark.parametrize(
