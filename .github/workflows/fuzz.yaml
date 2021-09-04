@@ -1,4 +1,4 @@
-name: Build
+name: Fuzz
 on:
   schedule:
     - cron: "0 0 * * *"
