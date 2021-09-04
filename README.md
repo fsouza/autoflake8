@@ -68,58 +68,32 @@ $ pip install --upgrade autoflake8
 
 ## Advanced usage
 
-To allow autoflake8 to remove additional unused imports (other than
-than those from the standard library), use the ``--imports`` option. It
-accepts a comma-separated list of names::
-
-```
-$ autoflake8 --imports=django,requests,urllib3 <filename>
-```
-
-To remove all unused imports (whether or not they are from the standard
-library), use the ``--remove-all-unused-imports`` option.
-
 To remove unused variables, use the ``--remove-unused-variables`` option.
 
 Below is the full listing of options::
 
 ```
-usage: autoflake8 [-h] [-i] [-r] [--exclude globs] [--imports IMPORTS]
-                    [--expand-star-imports] [--remove-all-unused-imports]
-                    [--remove-duplicate-keys] [--remove-unused-variables]
-                    [--version]
-                    files [files ...]
-
-Removes unused imports and unused variables as reported by pyflakes.
+％ poetry run autoflake8 --help
+usage: autoflake [-h] [-c] [-r] [--exclude globs] [--expand-star-imports] [--remove-duplicate-keys] [--remove-unused-variables] [--version] [-v] [-i | -s] files [files ...]
 
 positional arguments:
-    files                 files to format
+  files                 files to format
 
 optional arguments:
-    -h, --help            show this help message and exit
-    -c, --check           return error code if changes are needed
-    -i, --in-place        make changes to files instead of printing diffs
-    -r, --recursive       drill down directories recursively
-    --exclude globs       exclude file/directory names that match these comma-
-                        separated globs
-    --imports IMPORTS     by default, only unused standard library imports are
-                        removed; specify a comma-separated list of additional
-                        modules/packages
-    --expand-star-imports
-                        expand wildcard star imports with undefined names;
-                        this only triggers if there is only one star import in
-                        the file; this is skipped if there are any uses of
-                        `__all__` or `del` in the file
-    --remove-all-unused-imports
-                        remove all unused imports (not just those from the
-                        standard library)
-    --ignore-init-module-imports
-                        exclude __init__.py when removing unused imports
-    --remove-duplicate-keys
+  -h, --help            show this help message and exit
+  -c, --check           return error code if changes are needed
+  -r, --recursive       drill down directories recursively
+  --exclude globs       exclude file/directory names that match these comma-separated globs
+  --expand-star-imports
+                        expand wildcard star imports with undefined names; this only triggers if there is only one star import in the file; this is skipped if there are any uses of `__all__` or `del` in the file
+  --remove-duplicate-keys
                         remove all duplicate keys in objects
-    --remove-unused-variables
+  --remove-unused-variables
                         remove unused variables
-    --version             show program's version number and exit
+  --version             show program's version number and exit
+  -v, --verbose         print more verbose logs (you can repeat `-v` to make it more verbose)
+  -i, --in-place        make changes to files instead of printing diffs
+  -s, --stdout          print changed text to stdout. defaults to true when formatting stdin, or to false otherwise
 ```
 
 
@@ -128,7 +102,7 @@ optional arguments:
 To run the unit tests::
 
 ```
-$ pytest
+$ poetry run pytest
 ```
 
 There is also a fuzz test, which runs against any collection of given Python
@@ -138,7 +112,7 @@ results change for the worse. (This is done in memory. The actual files are
 left untouched.)::
 
 ```
-$ python test_fuzz.py --verbose
+$ poetry run scripts/test_fuzz.py
 ```
 
 ## Excluding specific lines
@@ -155,9 +129,6 @@ For example:
 ```python
 from .endpoints import role, token, user, utils
 ```
-
-As those imports are not being used directly, if you are using the option
-``--remove-all-unused-imports``, they would be removed.
 
 To prevent that, without having to exclude the entire file, you can add a
 ``# noqa`` comment at the end of the line, like:
