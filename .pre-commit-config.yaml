@@ -34,3 +34,11 @@ repos:
     rev: 3.9.2
     hooks:
       - id: flake8
+
+  - repo: local
+    hooks:
+      - id: check-version
+        name: check __init__.py and pyproject.toml consistency
+        language: python
+        entry: scripts/check_version.py
+        pass_filenames: false

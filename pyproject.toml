@@ -1,0 +1,46 @@
+[tool.poetry]
+name = "autoflake8"
+version = "0.1.0"
+description = "Tool to automatically fix some issues reported by flake8 (forked from autoflake)."
+authors = [
+  "Francisco Souza <fsouza@users.noreply.github.com>",
+]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/fsouza/autoflake8"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.6",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Topic :: Software Development :: Quality Assurance",
+]
+include = [
+  "AUTHORS.rst",
+  "LICENSE",
+  "README.md",
+]
+keywords = [
+  "flake8",
+  "automatic",
+  "fixer",
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+pyflakes = ">= 2.3.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+
+[tool.poetry.scripts]
+autoflake8 = "autoflake8.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
