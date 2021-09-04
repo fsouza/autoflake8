@@ -633,7 +633,11 @@ def _fix_file(
             ) as output_file:
                 output_file.write(filtered_source)
 
-            os.rename(output_file.name, filename)
+            # close the input file before replacing it, this is required on
+            # Windows.
+            input_file.close()
+
+            os.replace(output_file.name, filename)
             logger.info(f"Fixed {filename}")
         else:
             encoding = detect_source_encoding(original_source)
