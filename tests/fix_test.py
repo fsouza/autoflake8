@@ -23,7 +23,6 @@ from autoflake8.fix import find_files
 from autoflake8.fix import fix_code
 from autoflake8.fix import get_diff_text
 from autoflake8.fix import get_indentation
-from autoflake8.fix import get_line_ending
 from autoflake8.fix import is_exclude_file
 from autoflake8.fix import is_literal_or_name
 from autoflake8.fix import is_multiline_import
@@ -112,20 +111,6 @@ def test_unused_import_line_numbers_with_dot() -> None:
         )
         == [1]
     )
-
-
-@pytest.mark.parametrize(
-    ("source", "expected"),
-    [
-        (b"\n", b"\n"),
-        (b"abc\n", b"\n"),
-        (b"abc\t  \t\n", b"\t  \t\n"),
-        (b"abc", b""),
-        (b"", b""),
-    ],
-)
-def test_get_line_ending(source: bytes, expected: bytes) -> None:
-    assert get_line_ending(source) == expected
 
 
 @pytest.mark.parametrize(

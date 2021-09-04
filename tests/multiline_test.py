@@ -2,7 +2,7 @@ import functools
 from typing import Sequence
 from typing import Tuple
 
-from autoflake8.fix import FilterMultilineImport
+from autoflake8.multiline import FilterMultilineImport
 
 
 def test_is_over_parens() -> None:
