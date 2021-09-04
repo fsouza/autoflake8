@@ -74,4 +74,4 @@ jobs:
       - run: poetry install
 
       - name: run fuzz
-        run: python test_fuzz.py
+        run: poetry run python scripts/test_fuzz.py
