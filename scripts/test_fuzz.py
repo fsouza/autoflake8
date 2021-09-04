@@ -1,30 +1,30 @@
 """Test that autoflake performs correctly on arbitrary Python files.
-
+file.is_dir():
 This checks that autoflake never introduces incorrect syntax. This is
 done by doing a syntax check after the autoflake run. The number of
 Pyflakes warnings is also confirmed to always improve.
 """
+from __future__ import annotations
+
 import argparse
+import asyncio
 import difflib
 import os
 import pathlib
 import shlex
 import shutil
-import subprocess
 import sys
 import tempfile
-from typing import List
-from typing import Optional
+from typing import Iterator
 from typing import Sequence
 
+import aiofiles
 from autoflake8.fix import check as autoflake8_check
 from autoflake8.fix import detect_source_encoding
 
 
 ROOT_PATH = pathlib.Path(__file__).parent.parent.absolute()
 AUTOFLAKE8_BIN = f"'{sys.executable}' '{ROOT_PATH / 'autoflake8' / 'cli.py'}'"
-
-print(AUTOFLAKE8_BIN)
 
 if sys.stdout.isatty():
     YELLOW = "\x1b[33m"
@@ -39,96 +39,129 @@ def colored(text, color):
     return color + text + END
 
 
-def pyflakes_count(filename: str) -> int:
+async def info(msg: str) -> None:
+    await asyncio.to_thread(print, msg)
+
+
+async def debug(msg: str) -> None:
+    await asyncio.to_thread(print, msg, file=sys.stderr)
+
+
+async def pyflakes_count(file: pathlib.Path) -> int:
     """Return pyflakes error count."""
-    with open(filename, "rb") as f:
-        return len(list(autoflake8_check(f.read())))
+    async with aiofiles.open(file, "rb") as f:
+        return len(list(autoflake8_check(await f.read())))
 
 
-def readlines(filename: str) -> Sequence[str]:
+async def walk(dir_path: pathlib.Path) -> Iterator[tuple[str, list[str], list[str]]]:
+    def walk(p: str) -> Iterator[tuple[str, list[str], list[str]]]:
+        return os.walk(p)
+
+    return await asyncio.to_thread(walk, str(dir_path))
+
+
+async def exists(path: pathlib.Path) -> bool:
+    return await asyncio.to_thread(path.exists)
+
+
+async def is_dir(path: pathlib.Path) -> bool:
+    return await asyncio.to_thread(path.is_dir)
+
+
+async def readlines(file: pathlib.Path) -> Sequence[str]:
     """Return contents of file as a list of lines."""
-    with open(filename, "rb") as f:
-        source = f.read()
+    async with aiofiles.open(file, "rb") as f:
+        source = await f.read()
 
         return source.decode(
             encoding=detect_source_encoding(source),
         ).splitlines(keepends=True)
 
 
-def diff(before: str, after: str) -> str:
+async def diff(before: pathlib.Path, after: pathlib.Path) -> str:
     """Return diff of two files."""
 
     return "".join(
-        difflib.unified_diff(readlines(before), readlines(after), before, after),
+        difflib.unified_diff(
+            await readlines(before),
+            await readlines(after),
+            str(before),
+            str(after),
+        ),
     )
 
 
-def run(
-    filename: str,
+async def run(
+    file: pathlib.Path,
     command: str,
     verbose: bool = False,
-    options: Optional[List[str]] = None,
+    options: list[str] | None = None,
 ) -> bool:
     """
     Run autoflake on file at filename.
 
     Return True on success.
     """
+    await info(colored(f"--->  Testing with {file}", YELLOW))
+
     if not options:
         options = []
 
-    temp_directory: Optional[str] = None
+    temp_directory: str | None = None
     try:
-        temp_directory = tempfile.mkdtemp()
-        return _run(filename, command, temp_directory, verbose, options)
+        temp_directory = await asyncio.to_thread(tempfile.mkdtemp)
+        return await _run(file, command, pathlib.Path(temp_directory), verbose, options)
     finally:
         if temp_directory is not None:
-            shutil.rmtree(temp_directory)
+            await asyncio.to_thread(shutil.rmtree, temp_directory)
 
 
-def _run(
-    filename: str,
+async def _run(
+    file: pathlib.Path,
     command: str,
-    temp_directory: str,
+    temp_directory: pathlib.Path,
     verbose: bool,
-    options: List[str],
+    options: list[str],
 ) -> bool:
-    temp_filename = os.path.join(temp_directory, os.path.basename(filename))
+    temp_file = temp_directory / file.name
 
-    shutil.copyfile(filename, temp_filename)
+    await asyncio.to_thread(shutil.copyfile, file, temp_file)
 
-    if 0 != subprocess.call(
-        shlex.split(command) + ["--in-place", temp_filename] + options,
-    ):
-        sys.stderr.write("autoflake crashed on " + filename + "\n")
+    parts = shlex.split(command)
+    proc = await asyncio.create_subprocess_exec(
+        parts[0],
+        *parts[1:],
+        "--in-place",
+        str(temp_file),
+        *options,
+    )
+    status = await proc.wait()
+    if status != 0:
+        await debug(f"autoflake8 crashed on {file} with exit status {status}")
         return False
 
     try:
-        file_diff = diff(filename, temp_filename)
+        file_diff = await diff(file, temp_file)
         if verbose:
-            sys.stderr.write(file_diff)
+            await debug(file_diff)
 
-        if check_syntax(filename):
+        if await check_syntax(file):
             try:
-                check_syntax(temp_filename, raise_error=True)
-            except (
-                SyntaxError,
-                TypeError,
-                ValueError,
-            ) as exc:
-                sys.stderr.write(
-                    f"autoflake broke {filename}\n{str(exc)}\n",
+                await check_syntax(temp_file, raise_error=True)
+            except (SyntaxError, TypeError, ValueError) as exc:
+                await debug(
+                    f"autoflake broke {file}\n{str(exc)}",
                 )
                 return False
 
-        before_count = pyflakes_count(filename)
-        after_count = pyflakes_count(temp_filename)
+        before_count = await pyflakes_count(file)
+        after_count = await pyflakes_count(temp_file)
 
         if verbose:
             print("(before, after):", (before_count, after_count))
 
         if file_diff and after_count > before_count:
-            sys.stderr.write(f"autoflake made {filename} worse\n")
+            sys.stderr.write(f"autoflake made {file} worse\n")
             return False
     except OSError as exc:
         sys.stderr.write(f"{str(exc)}\n")
@@ -136,11 +169,11 @@ def _run(
     return True
 
 
-def check_syntax(filename: str, raise_error: bool = False) -> bool:
+async def check_syntax(file: pathlib.Path, raise_error: bool = False) -> bool:
     """Return True if syntax is okay."""
-    with open(filename) as input_file:
+    async with aiofiles.open(file, "rb") as input_file:
         try:
-            compile(input_file.read(), "<string>", "exec", dont_inherit=True)
+            compile(await input_file.read(), "<string>", "exec", dont_inherit=True)
             return True
         except (SyntaxError, TypeError, ValueError):
             if raise_error:
@@ -198,16 +231,18 @@ def process_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def check(args: argparse.Namespace) -> bool:
+async def check(args: argparse.Namespace) -> bool:
     """
-    Run recursively run autoflake on directory of files.
+    Run recursively runs autoflake8 on directory of files.
 
     Return False if the fix results in broken syntax.
     """
     if args.files:
-        dir_paths = args.files
+        dir_paths = [pathlib.Path(file).absolute() for file in args.files]
     else:
-        dir_paths = [path for path in sys.path if os.path.isdir(path)]
+        dir_paths = [
+            pathlib.Path(path).absolute() for path in sys.path if os.path.isdir(path)
+        ]
 
     options = []
     if args.expand_star_imports:
@@ -225,40 +260,60 @@ def check(args: argparse.Namespace) -> bool:
     if args.remove_unused_variables:
         options.append("--remove-unused-variables")
 
-    filenames = dir_paths
+    files: asyncio.Queue[pathlib.Path] = asyncio.Queue()
+    for dir_path in dir_paths:
+        files.put_nowait(dir_path)
+
     completed_filenames = set()
 
     files_to_skip = {"bad_coding.py", "badsyntax_pep3120.py"}
 
-    while filenames:
-        name = os.path.realpath(filenames.pop(0))
-        basename = os.path.basename(name)
-        if not os.path.exists(name):
-            # Invalid symlink.
+    while not files.empty():
+        file = await files.get()
+        if not await exists(file):
             continue
 
+        name = str(file)
         if name in completed_filenames:
-            sys.stderr.write(
-                colored(f"--->  Skipping previously tested {name}\n", YELLOW),
+            await info(
+                colored(f"--->  Skipping previously tested {name}", YELLOW),
             )
             continue
         else:
             completed_filenames.update(name)
 
-        if os.path.isdir(name):
-            for root, directories, children in os.walk(name):
-                filenames += [
-                    os.path.join(root, f)
+        if await is_dir(file):
+            walk_iter = await walk(file)
+            for root, directories, children in walk_iter:
+                root_p = pathlib.Path(root)
+                py_files = (
+                    root_p / f
                     for f in children
-                    if f.endswith(".py") and not f.startswith(".")
-                ]
+                    if f.endswith(".py")
+                    and not f.startswith(".")
+                    and f not in files_to_skip
+                )
+
+                # this is horrible, we need a worker model.
+                results = await asyncio.gather(
+                    *(
+                        run(
+                            f,
+                            command=args.command,
+                            verbose=args.verbose,
+                            options=options,
+                        )
+                        for f in py_files
+                    )
+                )
+
+                if not all(results):
+                    return False
 
                 directories[:] = [d for d in directories if not d.startswith(".")]
-        elif basename not in files_to_skip:
-            sys.stderr.write(colored(f"--->  Testing with {name}\n", YELLOW))
-
-            if not run(
-                os.path.join(name),
+        elif file.name not in files_to_skip:
+            if not await run(
+                file,
                 command=args.command,
                 verbose=args.verbose,
                 options=options,
@@ -268,13 +323,13 @@ def check(args: argparse.Namespace) -> bool:
     return True
 
 
-def main() -> int:
+async def main() -> int:
     """Run main."""
-    return 0 if check(process_args()) else 1
+    return 0 if await check(process_args()) else 1
 
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        sys.exit(asyncio.run(main()))
     except KeyboardInterrupt:
         sys.exit(1)
