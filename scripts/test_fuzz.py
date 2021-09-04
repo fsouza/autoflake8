@@ -166,14 +166,6 @@ def process_args() -> argparse.Namespace:
         help="expand wildcard star imports with undefined " "names",
     )
 
-    parser.add_argument("--imports", help='pass to the autoflake "--imports" option')
-
-    parser.add_argument(
-        "--remove-all-unused-imports",
-        action="store_true",
-        help='pass "--remove-all-unused-imports" option to ' "autoflake",
-    )
-
     parser.add_argument(
         "--remove-duplicate-keys",
         action="store_true",
@@ -212,12 +204,6 @@ def check(args: argparse.Namespace) -> bool:
     options = []
     if args.expand_star_imports:
         options.append("--expand-star-imports")
-
-    if args.imports:
-        options.append("--imports=" + args.imports)
-
-    if args.remove_all_unused_imports:
-        options.append("--remove-all-unused-imports")
 
     if args.remove_duplicate_keys:
         options.append("--remove-duplicate-keys")
