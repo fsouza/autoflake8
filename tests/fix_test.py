@@ -1,4 +1,5 @@
-"""Test suite for autoflake."""
+"""Test suite for """
+import logging
 import os
 import pathlib
 import re
@@ -10,7 +11,27 @@ from typing import List
 
 import pytest
 
-import autoflake
+from autoflake8.fix import break_up_import
+from autoflake8.fix import check
+from autoflake8.fix import detect_source_encoding
+from autoflake8.fix import filter_code
+from autoflake8.fix import filter_from_import
+from autoflake8.fix import filter_star_import
+from autoflake8.fix import filter_unused_variable
+from autoflake8.fix import filter_useless_pass
+from autoflake8.fix import find_files
+from autoflake8.fix import fix_code
+from autoflake8.fix import get_diff_text
+from autoflake8.fix import get_indentation
+from autoflake8.fix import get_line_ending
+from autoflake8.fix import is_exclude_file
+from autoflake8.fix import is_literal_or_name
+from autoflake8.fix import is_multiline_import
+from autoflake8.fix import is_multiline_statement
+from autoflake8.fix import is_python_file
+from autoflake8.fix import match_file
+from autoflake8.fix import unused_import_line_numbers
+from autoflake8.fix import useless_pass_line_numbers
 
 
 @pytest.mark.parametrize(
@@ -59,13 +80,13 @@ import autoflake
     ],
 )
 def test_detect_source_encoding(source: bytes, expected: str) -> None:
-    assert autoflake.detect_source_encoding(source) == expected
+    assert detect_source_encoding(source) == expected
 
 
 def test_unused_import_line_numbers() -> None:
     assert (
         list(
-            autoflake.unused_import_line_numbers(autoflake.check(b"import os\n")),
+            unused_import_line_numbers(check(b"import os\n")),
         )
         == [1]
     )
@@ -74,8 +95,8 @@ def test_unused_import_line_numbers() -> None:
 def test_unused_import_line_numbers_with_from() -> None:
     assert (
         list(
-            autoflake.unused_import_line_numbers(
-                autoflake.check(b"from os import path\n"),
+            unused_import_line_numbers(
+                check(b"from os import path\n"),
             ),
         )
         == [1]
@@ -85,8 +106,8 @@ def test_unused_import_line_numbers_with_from() -> None:
 def test_unused_import_line_numbers_with_dot() -> None:
     assert (
         list(
-            autoflake.unused_import_line_numbers(
-                autoflake.check(b"import os.path\n"),
+            unused_import_line_numbers(
+                check(b"import os.path\n"),
             ),
         )
         == [1]
@@ -104,7 +125,7 @@ def test_unused_import_line_numbers_with_dot() -> None:
     ],
 )
 def test_get_line_ending(source: bytes, expected: bytes) -> None:
-    assert autoflake.get_line_ending(source) == expected
+    assert get_line_ending(source) == expected
 
 
 @pytest.mark.parametrize(
@@ -119,55 +140,54 @@ def test_get_line_ending(source: bytes, expected: bytes) -> None:
     ],
 )
 def test_get_indentation(source: bytes, expected: bytes) -> None:
-    assert autoflake.get_indentation(source) == expected
+    assert get_indentation(source) == expected
 
 
 def test_filter_star_import() -> None:
     assert (
-        autoflake.filter_star_import(b"from math import *", [b"cos"])
-        == b"from math import cos"
+        filter_star_import(b"from math import *", [b"cos"]) == b"from math import cos"
     )
 
     assert (
-        autoflake.filter_star_import(b"from math import *", [b"sin", b"cos"])
+        filter_star_import(b"from math import *", [b"sin", b"cos"])
         == b"from math import cos, sin"
     )
 
 
 def test_filter_unused_variable() -> None:
-    assert autoflake.filter_unused_variable(b"x = foo()") == b"foo()"
+    assert filter_unused_variable(b"x = foo()") == b"foo()"
 
-    assert autoflake.filter_unused_variable(b"    x = foo()") == b"    foo()"
+    assert filter_unused_variable(b"    x = foo()") == b"    foo()"
 
 
 def test_filter_unused_variable_with_literal_or_name() -> None:
-    assert autoflake.filter_unused_variable(b"x = 1") == b"pass"
-    assert autoflake.filter_unused_variable(b"x = y") == b"pass"
-    assert autoflake.filter_unused_variable(b"x = {}") == b"pass"
+    assert filter_unused_variable(b"x = 1") == b"pass"
+    assert filter_unused_variable(b"x = y") == b"pass"
+    assert filter_unused_variable(b"x = {}") == b"pass"
 
 
 def test_filter_unused_variable_with_basic_data_structures() -> None:
-    assert autoflake.filter_unused_variable(b"x = dict()") == b"pass"
-    assert autoflake.filter_unused_variable(b"x = list()") == b"pass"
-    assert autoflake.filter_unused_variable(b"x = set()") == b"pass"
+    assert filter_unused_variable(b"x = dict()") == b"pass"
+    assert filter_unused_variable(b"x = list()") == b"pass"
+    assert filter_unused_variable(b"x = set()") == b"pass"
 
 
 def test_filter_unused_variable_should_ignore_multiline() -> None:
-    assert autoflake.filter_unused_variable(b"x = foo()\\") == b"x = foo()\\"
+    assert filter_unused_variable(b"x = foo()\\") == b"x = foo()\\"
 
 
 def test_filter_unused_variable_should_multiple_assignments() -> None:
-    assert autoflake.filter_unused_variable(b"x = y = foo()") == b"x = y = foo()"
+    assert filter_unused_variable(b"x = y = foo()") == b"x = y = foo()"
 
 
 def test_filter_unused_variable_with_exception() -> None:
     assert (
-        autoflake.filter_unused_variable(b"except Exception as exception:")
+        filter_unused_variable(b"except Exception as exception:")
         == b"except Exception:"
     )
 
     assert (
-        autoflake.filter_unused_variable(
+        filter_unused_variable(
             b"except (ImportError, ValueError) as foo:",
         )
         == b"except (ImportError, ValueError):"
@@ -176,7 +196,7 @@ def test_filter_unused_variable_with_exception() -> None:
 
 def test_filter_code() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 import os
 import re
@@ -196,7 +216,7 @@ os.foo()
 
 def test_filter_code_with_indented_import() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 import os
 if True:
@@ -218,7 +238,7 @@ os.foo()
 
 def test_filter_code_with_from() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from os import path
 x = 1
@@ -236,7 +256,7 @@ x = 1
 
 def test_filter_code_with_not_from() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 import frommer
 x = 1
@@ -254,7 +274,7 @@ x = 1
 
 def test_filter_code_with_used_from() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 import frommer
 print(frommer)
@@ -272,7 +292,7 @@ print(frommer)
 
 def test_filter_code_with_ambiguous_from() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from frommer import abc, frommer, xyz
 """,
@@ -293,7 +313,7 @@ except: from zap import bar
 """
     assert (
         b"".join(
-            autoflake.filter_code(line),
+            filter_code(line),
         )
         == line
     )
@@ -306,12 +326,12 @@ from zap import foo
 except:\\
 from zap import bar
 """
-    assert b"".join(autoflake.filter_code(line)) == line
+    assert b"".join(filter_code(line)) == line
 
 
 def test_filter_code_with_remove_all_unused_imports() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 import foo
 import zap
@@ -331,7 +351,7 @@ x = 1
 
 def test_filter_code_should_ignore_imports_with_inline_comment() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from os import path  # foo
 from os import path
@@ -353,7 +373,7 @@ x = 1
 
 def test_filter_code_should_respect_noqa() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from os import path
 import re  # noqa
@@ -377,7 +397,7 @@ x = 1
 
 def test_filter_code_expand_star_imports__one_function() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from math import *
 sin(1)
@@ -396,7 +416,7 @@ sin(1)
 
 def test_filter_code_expand_star_imports__two_functions() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from math import *
 sin(1)
@@ -417,7 +437,7 @@ cos(1)
 
 def test_filter_code_ignore_multiple_star_import() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 from math import *
 from re import *
@@ -440,7 +460,7 @@ cos(1)
 
 def test_filter_code_with_special_re_symbols_in_key() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             b"""\
 a = {
 '????': 3,
@@ -499,7 +519,7 @@ import os, math, subprocess
     ],
 )
 def test_is_multiline_import(line: bytes, previous_line: bytes, expected: bool) -> None:
-    assert autoflake.is_multiline_import(line, previous_line=previous_line) is expected
+    assert is_multiline_import(line, previous_line=previous_line) is expected
 
 
 @pytest.mark.parametrize(
@@ -513,9 +533,7 @@ def test_is_multiline_import(line: bytes, previous_line: bytes, expected: bool) 
     ],
 )
 def test_multiline_statement(line: bytes, previous_line: bytes, expected: bool) -> None:
-    assert (
-        autoflake.is_multiline_statement(line, previous_line=previous_line) is expected
-    )
+    assert is_multiline_statement(line, previous_line=previous_line) is expected
 
 
 @pytest.mark.parametrize(
@@ -539,11 +557,11 @@ def test_multiline_statement(line: bytes, previous_line: bytes, expected: bool) 
     ],
 )
 def test_break_up_import(line: bytes, expected: bytes) -> None:
-    assert autoflake.break_up_import(line) == expected
+    assert break_up_import(line) == expected
 
 
 def test_filter_from_import_no_remove() -> None:
-    result = autoflake.filter_from_import(
+    result = filter_from_import(
         b"    from foo import abc, subprocess, math\n",
         unused_module=(),
     )
@@ -555,7 +573,7 @@ def test_filter_from_import_no_remove() -> None:
 
 
 def test_filter_from_import_remove_module() -> None:
-    result = autoflake.filter_from_import(
+    result = filter_from_import(
         b"    from foo import abc, subprocess, math\n",
         unused_module=(b"foo.abc",),
     )
@@ -567,7 +585,7 @@ def test_filter_from_import_remove_module() -> None:
 
 
 def test_filter_from_import() -> None:
-    result = autoflake.filter_from_import(
+    result = filter_from_import(
         b"    from foo import abc, subprocess, math\n",
         unused_module=(b"foo.abc", b"foo.subprocess", b"foo.math"),
     )
@@ -579,7 +597,7 @@ def test_filter_from_import() -> None:
 
 def test_filter_code_multiline_imports() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             rb"""\
 import os
 import re
@@ -602,7 +620,7 @@ os.foo()
 
 def test_filter_code_multiline_from_imports() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             rb"""\
 import os
 import re
@@ -642,7 +660,7 @@ isdir('42')
 
 def test_filter_code_should_ignore_semicolons() -> None:
     result = b"".join(
-        autoflake.filter_code(
+        filter_code(
             rb"""\
 import os
 import re
@@ -670,11 +688,11 @@ def foo():
 '''
 """
 
-    assert b"".join(autoflake.filter_code(line)) == line
+    assert b"".join(filter_code(line)) == line
 
 
 def test_fix_code() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 import os
 import re
@@ -699,7 +717,7 @@ x = version
 
 
 def test_fix_code_with_from_and_as__mixed() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from collections import defaultdict, namedtuple as xyz
 xyz
@@ -715,7 +733,7 @@ xyz
 
 
 def test_fix_code_with_from_and_as__multiple() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from collections import defaultdict as abc, namedtuple as xyz
 xyz
@@ -731,7 +749,7 @@ xyz
 
 
 def test_fix_code_with_from_and_as__unused_as() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from collections import defaultdict as abc, namedtuple
 namedtuple
@@ -747,7 +765,7 @@ namedtuple
 
 
 def test_fix_code_with_from_and_as__all_unused() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from collections import defaultdict as abc, namedtuple as xyz
 """,
@@ -761,7 +779,7 @@ def test_fix_code_with_from_and_as__custom_modules() -> None:
 from x import a as b, c as d
 """
 
-    assert autoflake.fix_code(code) == b""
+    assert fix_code(code) == b""
 
 
 def test_fix_code_with_from_and_depth_module() -> None:
@@ -769,7 +787,7 @@ def test_fix_code_with_from_and_depth_module() -> None:
 from distutils.version import StrictVersion
 StrictVersion('1.0.0')
 """
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from distutils.version import LooseVersion, StrictVersion
 StrictVersion('1.0.0')
@@ -780,7 +798,7 @@ StrictVersion('1.0.0')
 
 
 def test_fix_code_with_from_and_depth_module__aliasing() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from distutils.version import LooseVersion, StrictVersion as version
 version('1.0.0')
@@ -796,7 +814,7 @@ version('1.0.0')
 
 
 def test_fix_code_with_indented_from() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 def z():
     from ctypes import c_short, c_uint, c_int, c_long, pointer, POINTER, byref
@@ -814,7 +832,7 @@ def z():
 
 
 def test_fix_code_with_indented_from__all_unused() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 def z():
     from ctypes import c_short, c_uint, c_int, c_long, pointer, POINTER, byref
@@ -830,12 +848,12 @@ def z():
 
 
 def test_fix_code_with_empty_string() -> None:
-    assert autoflake.fix_code(b"") == b""
+    assert fix_code(b"") == b""
 
 
 def test_fix_code_with_from_and_as_and_escaped_newline() -> None:
     b"""Make sure stuff after escaped newline is not lost."""
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 from collections import defaultdict, namedtuple \\
 as xyz
@@ -852,11 +870,11 @@ from collections import namedtuple as xyz
 xyz
 """
 
-    assert autoflake.fix_code(result) == expected
+    assert fix_code(result) == expected
 
 
 def test_fix_code_with_unused_variables() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 def main():
     x = 10
@@ -886,11 +904,11 @@ def bar():
         x = 2
 """
 
-    assert autoflake.fix_code(code, remove_unused_variables=True) == code
+    assert fix_code(code, remove_unused_variables=True) == code
 
 
 def test_fix_code_with_comma_on_right() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 def main():
     x = (1, 2, 3)
@@ -913,17 +931,17 @@ def main():
     print(z)
 """
 
-    assert autoflake.fix_code(code, remove_unused_variables=True) == code
+    assert fix_code(code, remove_unused_variables=True) == code
 
 
 def test_fix_code_should_handle_pyflakes_recursion_error_gracefully() -> None:
     code = "x = [{}]".format("+".join("abc" for _ in range(2000))).encode()
 
-    assert autoflake.fix_code(code) == code
+    assert fix_code(code) == code
 
 
 def test_fix_code_with_duplicate_key() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 a = {
     (0,1): 1,
@@ -957,7 +975,7 @@ def test_fix_code_with_duplicate_key_longer() -> None:
 }
 """
 
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 {
     'a': 0,
@@ -976,7 +994,7 @@ def test_fix_code_with_duplicate_key_longer() -> None:
 
 
 def test_fix_code_with_duplicate_key_with_many_braces() -> None:
-    result = autoflake.fix_code(
+    result = fix_code(
         b"""\
 a = None
 
@@ -1013,7 +1031,7 @@ a = {(0,1): 1, (0, 1): 'two',
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_fix_code_should_ignore_complex_case_of_duplicate_key_comma() -> None:
@@ -1026,7 +1044,7 @@ def test_fix_code_should_ignore_complex_case_of_duplicate_key_comma() -> None:
 }
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_fix_code_should_ignore_complex_case_of_duplicate_key_partially() -> None:
@@ -1049,7 +1067,7 @@ a = {(0,1): 1, (0, 1): 'two',
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == expected
+    assert fix_code(code, remove_duplicate_keys=True) == expected
 
 
 def test_fix_code_should_ignore_more_cases_of_duplicate_key() -> None:
@@ -1064,7 +1082,7 @@ a = {
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_fix_code_should_ignore_duplicate_key_with_comments() -> None:
@@ -1080,7 +1098,7 @@ a = {
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
     code = b"""\
 {
@@ -1092,7 +1110,7 @@ print(a)
 }
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_fix_code_should_ignore_duplicate_key_with_multiline_key() -> None:
@@ -1107,7 +1125,7 @@ a = {
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_fix_code_should_ignore_duplicate_key_with_no_comma() -> None:
@@ -1122,22 +1140,22 @@ a = {
 print(a)
 """
 
-    assert autoflake.fix_code(code, remove_duplicate_keys=True) == code
+    assert fix_code(code, remove_duplicate_keys=True) == code
 
 
 def test_useless_pass_line_numbers() -> None:
-    assert list(autoflake.useless_pass_line_numbers(b"pass\n")) == [1]
+    assert list(useless_pass_line_numbers(b"pass\n")) == [1]
 
-    assert list(autoflake.useless_pass_line_numbers(b"if True:\n    pass\n")) == []
+    assert list(useless_pass_line_numbers(b"if True:\n    pass\n")) == []
 
 
 def test_useless_pass_line_numbers_with_escaped_newline() -> None:
-    assert list(autoflake.useless_pass_line_numbers(b"if True:\\\n    pass\n")) == []
+    assert list(useless_pass_line_numbers(b"if True:\\\n    pass\n")) == []
 
 
 def test_useless_pass_line_numbers_with_more_complex() -> None:
     result = list(
-        autoflake.useless_pass_line_numbers(
+        useless_pass_line_numbers(
             b"""\
 if True:
     pass
@@ -1154,7 +1172,7 @@ else:
 
 def test_filter_useless_pass() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 if True:
     pass
@@ -1192,12 +1210,12 @@ else:
     x = 1
 """
 
-    assert b"".join(autoflake.filter_useless_pass(source)) == source
+    assert b"".join(filter_useless_pass(source)) == source
 
 
 def test_filter_useless_pass_more_complex() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 if True:
     pass
@@ -1242,7 +1260,7 @@ else:
 
 def test_filter_useless_pass_with_try() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 import os
 os.foo()
@@ -1269,7 +1287,7 @@ except ImportError:
 
 def test_filter_useless_pass_leading_pass() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 if True:
     pass
@@ -1298,7 +1316,7 @@ else:
 
 def test_filter_useless_pass_leading_pass_with_number() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 def func11():
     pass
@@ -1319,7 +1337,7 @@ def func11():
 
 def test_filter_useless_pass_leading_pass_with_string() -> None:
     result = b"".join(
-        autoflake.filter_useless_pass(
+        filter_useless_pass(
             b"""\
 def func11():
     pass
@@ -1339,22 +1357,22 @@ def func11():
 
 
 def test_check() -> None:
-    assert autoflake.check(b"import os")
+    assert check(b"import os")
 
 
 def test_check_with_bad_syntax() -> None:
-    assert autoflake.check(b"foo(") == []
+    assert check(b"foo(") == []
 
 
 def test_check_with_unicode() -> None:
-    assert autoflake.check('print("∑")'.encode()) == []
+    assert check('print("∑")'.encode()) == []
 
-    assert autoflake.check("import os  # ∑".encode())
+    assert check("import os  # ∑".encode())
 
 
 def test_get_diff_text() -> None:
     result = "\n".join(
-        autoflake.get_diff_text(["foo\n"], ["bar\n"], "").split("\n")[3:],
+        get_diff_text(["foo\n"], ["bar\n"], "").split("\n")[3:],
     )
 
     expected = """\
@@ -1366,7 +1384,7 @@ def test_get_diff_text() -> None:
 
 
 def test_get_diff_text_without_newline() -> None:
-    result = "\n".join(autoflake.get_diff_text(["foo"], ["foo\n"], "").split("\n")[3:])
+    result = "\n".join(get_diff_text(["foo"], ["foo\n"], "").split("\n")[3:])
 
     expected = """\
 -foo
@@ -1378,38 +1396,38 @@ def test_get_diff_text_without_newline() -> None:
 
 
 def test_is_literal_or_name() -> None:
-    assert autoflake.is_literal_or_name(b"123") is True
-    assert autoflake.is_literal_or_name(b"[1, 2, 3]") is True
-    assert autoflake.is_literal_or_name(b"xyz") is True
+    assert is_literal_or_name(b"123") is True
+    assert is_literal_or_name(b"[1, 2, 3]") is True
+    assert is_literal_or_name(b"xyz") is True
 
-    assert autoflake.is_literal_or_name(b"xyz.prop") is False
-    assert autoflake.is_literal_or_name(b" ") is False
-    assert autoflake.is_literal_or_name(b" 1") is False
+    assert is_literal_or_name(b"xyz.prop") is False
+    assert is_literal_or_name(b" ") is False
+    assert is_literal_or_name(b" 1") is False
 
 
 def test_is_python_file(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     root_dir: pathlib.Path,
 ) -> None:
-    assert autoflake.is_python_file(str(root_dir / "autoflake.py")) is True
+    assert is_python_file(str(root_dir / "autoflake8" / "cli.py")) is True
 
     with temporary_file("#!/usr/bin/env python", suffix="") as filename:
-        assert autoflake.is_python_file(filename) is True
+        assert is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/python", suffix="") as filename:
-        assert autoflake.is_python_file(filename) is True
+        assert is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/python3", suffix="") as filename:
-        assert autoflake.is_python_file(filename) is True
+        assert is_python_file(filename) is True
 
     with temporary_file("#!/usr/bin/pythonic", suffix="") as filename:
-        assert autoflake.is_python_file(filename) is False
+        assert is_python_file(filename) is False
 
     with temporary_file("###!/usr/bin/python", suffix="") as filename:
-        assert autoflake.is_python_file(filename) is False
+        assert is_python_file(filename) is False
 
-    assert autoflake.is_python_file(os.devnull) is False
-    assert autoflake.is_python_file("/bin/bash") is False
+    assert is_python_file(os.devnull) is False
+    assert is_python_file("/bin/bash") is False
 
 
 @pytest.mark.parametrize(
@@ -1423,22 +1441,23 @@ def test_is_python_file(
     ],
 )
 def test_is_exclude_file(filename: str, exclude: Iterable[str], expected: bool) -> None:
-    assert autoflake.is_exclude_file(filename, exclude) is expected
+    assert is_exclude_file(filename, exclude) is expected
 
 
 def test_match_file(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file("", suffix=".py", prefix=".") as filename:
-        assert autoflake.match_file(filename, exclude=[]) is False
+        assert match_file(filename, exclude=[], logger=logger) is False
 
-    assert autoflake.match_file(os.devnull, exclude=[]) is False
+    assert match_file(os.devnull, exclude=[], logger=logger) is False
 
     with temporary_file("", suffix=".py", prefix="") as filename:
-        assert autoflake.match_file(filename, exclude=[]) is True
+        assert match_file(filename, exclude=[], logger=logger) is True
 
 
-def test_find_files(tmp_path: pathlib.Path) -> None:
+def test_find_files(tmp_path: pathlib.Path, logger: logging.Logger) -> None:
     target = tmp_path / "dir"
     target.mkdir(parents=True)
 
@@ -1458,7 +1477,7 @@ def test_find_files(tmp_path: pathlib.Path) -> None:
     os.chdir(tmp_path)
     try:
         files = list(
-            autoflake.find_files(["dir"], True, [str(exclude)]),
+            find_files(["dir"], True, [str(exclude)], logger=logger),
         )
     finally:
         os.chdir(cwd)

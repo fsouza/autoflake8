@@ -1,25 +1,3 @@
-#!/usr/bin/env python
-# Copyright (C) 2012-2019 Steven Myint
-#
-# Permission is hereby granted, free of charge, to any person obtaining
-# a copy of this software and associated documentation files (the
-# "Software"), to deal in the Software without restriction, including
-# without limitation the rights to use, copy, modify, merge, publish,
-# distribute, sublicense, and/or sell copies of the Software, and to
-# permit persons to whom the Software is furnished to do so, subject to
-# the following conditions:
-#
-# The above copyright notice and this permission notice shall be included
-# in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""Removes unused imports and unused variables as reported by pyflakes."""
 import argparse
 import ast
 import collections
@@ -29,7 +7,6 @@ import io
 import logging
 import os
 import re
-import signal
 import string
 import sys
 import tempfile
@@ -42,7 +19,6 @@ from typing import List
 from typing import Mapping
 from typing import Optional
 from typing import Sequence
-from typing import Set
 from typing import Tuple
 from typing import Union
 
@@ -50,12 +26,6 @@ import pyflakes.api
 import pyflakes.messages
 import pyflakes.reporter
 
-
-__version__ = "1.4"
-
-
-_LOGGER = logging.getLogger("autoflake")
-_LOGGER.propagate = False
 
 ATOMS = frozenset([tokenize.NAME, tokenize.NUMBER, tokenize.STRING])
 
@@ -72,24 +42,20 @@ class Regex:
     CODING = re.compile(rb"^[ \t\f]*#.*?coding[:=][ \t]*([-_.a-zA-Z0-9]+)")
 
 
-class LogStreamAdapter:
-    def __init__(self, stream: IO[bytes]) -> None:
-        self.stream = stream
-
-    def write(self, v: str) -> int:
-        return self.stream.write(v.encode())
-
-    def flush(self) -> None:
-        self.stream.flush()
-
-
-whitespace = string.whitespace.encode()
+bytes_wsp = string.whitespace.encode()
 
 
 def detect_source_encoding(source: bytes) -> str:
     """
-    See PEP-263 for details.
+    Detects the encoding of a byte stream representing a Python source file
+    following the rules defined in PEP-263:
+
+    - only checks the first two lines
+    - match each of the lines with a regular expression (the regexp is copied
+      verbatim from the PEP)
+    - if no encoding defined, assume it is utf-8
     """
+
     lines = source.splitlines()[:2]
     for line in lines:
         m = Regex.CODING.match(line)
@@ -290,7 +256,7 @@ def _segment_module(segment: bytes) -> bytes:
     identifiers, so they will never be contained in the list of unused modules
     anyway.
     """
-    return segment.strip(whitespace + b",\\()") or segment
+    return segment.strip(bytes_wsp + b",\\()") or segment
 
 
 class FilterMultilineImport(PendingFix):
@@ -373,10 +339,10 @@ class FilterMultilineImport(PendingFix):
 
             # Fix the edge case: inline parenthesis + just one surviving import
             if self.parenthesized and any(ch not in fixed for ch in b"()"):
-                fixed = fixed.strip(whitespace + b"()") + ending
+                fixed = fixed.strip(bytes_wsp + b"()") + ending
 
         # Replace empty imports with a "pass" statement
-        empty = len(fixed.strip(whitespace + b"\\(),")) < 1
+        empty = len(fixed.strip(bytes_wsp + b"\\(),")) < 1
         if empty:
             indentation_match = Regex.INDENTATION.search(self.from_)
             if indentation_match:
@@ -780,7 +746,13 @@ def fix_code(
     return filtered_source
 
 
-def fix_file(filename: str, args: argparse.Namespace, standard_out: IO[bytes]) -> None:
+def fix_file(
+    *,
+    filename: str,
+    args: argparse.Namespace,
+    stdout: IO[bytes],
+    logger: logging.Logger,
+) -> None:
     """Run fix_code() on a file."""
     with open(filename, "rb+") as input_file:
         _fix_file(
@@ -788,8 +760,19 @@ def fix_file(filename: str, args: argparse.Namespace, standard_out: IO[bytes]) -
             filename,
             args,
             args.write_to_stdout,
-            standard_out,
+            stdout,
+            logger=logger,
         )
+
+
+def fix_stdin(
+    *,
+    stdin: IO[bytes],
+    stdout: IO[bytes],
+    args: argparse.Namespace,
+    logger: logging.Logger,
+) -> None:
+    _fix_file(stdin, "<stdin>", args, True, stdout, logger)
 
 
 def _fix_file(
@@ -797,7 +780,8 @@ def _fix_file(
     filename: str,
     args: argparse.Namespace,
     write_to_stdout: bool,
-    standard_out: IO[bytes],
+    stdout: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     source = input_file.read()
     original_source = source
@@ -811,12 +795,12 @@ def _fix_file(
 
     if original_source != filtered_source:
         if args.check:
-            standard_out.write(
+            stdout.write(
                 f"{filename}: Unused imports/variables detected".encode(),
             )
             sys.exit(1)
         if write_to_stdout:
-            standard_out.write(filtered_source)
+            stdout.write(filtered_source)
         elif args.in_place:
             with tempfile.NamedTemporaryFile(
                 delete=False,
@@ -825,7 +809,7 @@ def _fix_file(
                 output_file.write(filtered_source)
 
             os.rename(output_file.name, filename)
-            _LOGGER.info(f"Fixed {filename}")
+            logger.info(f"Fixed {filename}")
         else:
             encoding = detect_source_encoding(original_source)
             diff = get_diff_text(
@@ -839,14 +823,14 @@ def _fix_file(
                 ],
                 filename,
             )
-            standard_out.write(diff.encode())
+            stdout.write(diff.encode())
     elif write_to_stdout:
-        standard_out.write(filtered_source)
+        stdout.write(filtered_source)
     else:
         if args.check:
-            standard_out.write(b"No issues detected!\n")
+            stdout.write(b"No issues detected!\n")
         else:
-            _LOGGER.debug("Clean %s: nothing to fix", filename)
+            logger.debug("Clean %s: nothing to fix", filename)
 
 
 def get_diff_text(old: Sequence[str], new: Sequence[str], filename: str) -> str:
@@ -869,11 +853,6 @@ def get_diff_text(old: Sequence[str], new: Sequence[str], filename: str) -> str:
             text += newline + r"\ No newline at end of file" + newline
 
     return text
-
-
-def _split_comma_separated(string: str) -> Set[str]:
-    """Return a set of strings."""
-    return {text.strip() for text in string.split(",") if text.strip()}
 
 
 def is_python_file(filename: str) -> bool:
@@ -914,10 +893,10 @@ def is_exclude_file(filename: str, exclude: Iterable[str]) -> bool:
     return False
 
 
-def match_file(filename: str, exclude: Iterable[str]) -> bool:
+def match_file(filename: str, exclude: Iterable[str], logger: logging.Logger) -> bool:
     """Return True if file is okay for modifying/recursing."""
     if is_exclude_file(filename, exclude):
-        _LOGGER.debug("Skipped %s: matched to exclude pattern", filename)
+        logger.debug("Skipped %s: matched to exclude pattern", filename)
         return False
 
     if not os.path.isdir(filename) and not is_python_file(filename):
@@ -930,6 +909,7 @@ def find_files(
     filenames: List[str],
     recursive: bool,
     exclude: Iterable[str],
+    logger: logging.Logger,
 ) -> Iterator[str]:
     """Yield filenames."""
     while filenames:
@@ -939,157 +919,15 @@ def find_files(
                 filenames += [
                     os.path.join(root, f)
                     for f in children
-                    if match_file(os.path.join(root, f), exclude)
+                    if match_file(os.path.join(root, f), exclude, logger)
                 ]
                 directories[:] = [
-                    d for d in directories if match_file(os.path.join(root, d), exclude)
+                    d
+                    for d in directories
+                    if match_file(os.path.join(root, d), exclude, logger)
                 ]
         else:
             if not is_exclude_file(name, exclude):
                 yield name
             else:
-                _LOGGER.debug("Skipped %s: matched to exclude pattern", name)
-
-
-def _main(
-    argv: Sequence[str],
-    stdout: IO[bytes],
-    stderr: IO[bytes],
-    stdin: IO[bytes],
-) -> int:
-    """
-    Returns exit status.
-
-    0 means no error.
-    """
-
-    parser = argparse.ArgumentParser(description=__doc__, prog="autoflake")
-    parser.add_argument(
-        "-c",
-        "--check",
-        action="store_true",
-        help="return error code if changes are needed",
-    )
-    parser.add_argument(
-        "-r",
-        "--recursive",
-        action="store_true",
-        help="drill down directories recursively",
-    )
-    parser.add_argument(
-        "--exclude",
-        metavar="globs",
-        help="exclude file/directory names that match these comma-separated globs",
-    )
-    parser.add_argument(
-        "--expand-star-imports",
-        action="store_true",
-        help="expand wildcard star imports with undefined "
-        "names; this only triggers if there is only "
-        "one star import in the file; this is skipped if "
-        "there are any uses of `__all__` or `del` in the "
-        "file",
-    )
-    parser.add_argument(
-        "--remove-duplicate-keys",
-        action="store_true",
-        help="remove all duplicate keys in objects",
-    )
-    parser.add_argument(
-        "--remove-unused-variables",
-        action="store_true",
-        help="remove unused variables",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="%(prog)s " + __version__,
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        dest="verbosity",
-        default=0,
-        help="print more verbose logs (you can " "repeat `-v` to make it more verbose)",
-    )
-    parser.add_argument("files", nargs="+", help="files to format")
-
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "-i",
-        "--in-place",
-        action="store_true",
-        help="make changes to files instead of printing diffs",
-    )
-    group.add_argument(
-        "-s",
-        "--stdout",
-        action="store_true",
-        dest="write_to_stdout",
-        help=(
-            "print changed text to stdout. defaults to true "
-            "when formatting stdin, or to false otherwise"
-        ),
-    )
-
-    args = parser.parse_args(argv[1:])
-
-    if stderr is None:
-        _LOGGER.addHandler(logging.NullHandler())
-    else:
-        _LOGGER.addHandler(logging.StreamHandler(LogStreamAdapter(stderr)))
-        loglevels = [logging.WARNING, logging.INFO, logging.DEBUG]
-        try:
-            loglevel = loglevels[args.verbosity]
-        except IndexError:  # Too much -v
-            loglevel = loglevels[-1]
-        _LOGGER.setLevel(loglevel)
-
-    if args.exclude:
-        args.exclude = _split_comma_separated(args.exclude)
-    else:
-        args.exclude = set()
-
-    filenames = list(set(args.files))
-    failure = False
-    for name in find_files(filenames, args.recursive, args.exclude):
-        if name == "-":
-            _fix_file(
-                stdin,
-                "<stdin>",
-                args=args,
-                write_to_stdout=True,
-                standard_out=stdout,
-            )
-        else:
-            try:
-                fix_file(name, args=args, standard_out=stdout)
-            except OSError as exception:
-                _LOGGER.error(str(exception))
-                failure = True
-
-    return 1 if failure else 0
-
-
-def main() -> int:
-    """Command-line entry point."""
-    try:
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    except AttributeError:
-        # SIGPIPE is not available on Windows.
-        pass
-
-    try:
-        return _main(
-            sys.argv,
-            stdout=sys.stdout.buffer,
-            stderr=sys.stderr.buffer,
-            stdin=sys.stdin.buffer,
-        )
-    except KeyboardInterrupt:
-        return 2
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+                logger.debug("Skipped %s: matched to exclude pattern", name)

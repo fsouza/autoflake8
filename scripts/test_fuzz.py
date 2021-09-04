@@ -17,11 +17,14 @@ from typing import List
 from typing import Optional
 from typing import Sequence
 
-import autoflake
+from autoflake8.fix import check as autoflake8_check
+from autoflake8.fix import detect_source_encoding
 
 
-ROOT_PATH = pathlib.Path(__file__).parent.absolute()
-AUTOFLAKE_BIN = f"'{sys.executable}' '{ROOT_PATH / 'autoflake.py'}'"
+ROOT_PATH = pathlib.Path(__file__).parent.parent.absolute()
+AUTOFLAKE8_BIN = f"'{sys.executable}' '{ROOT_PATH / 'autoflake8' / 'cli.py'}'"
+
+print(AUTOFLAKE8_BIN)
 
 if sys.stdout.isatty():
     YELLOW = "\x1b[33m"
@@ -39,7 +42,7 @@ def colored(text, color):
 def pyflakes_count(filename: str) -> int:
     """Return pyflakes error count."""
     with open(filename, "rb") as f:
-        return len(list(autoflake.check(f.read())))
+        return len(list(autoflake8_check(f.read())))
 
 
 def readlines(filename: str) -> Sequence[str]:
@@ -48,7 +51,7 @@ def readlines(filename: str) -> Sequence[str]:
         source = f.read()
 
         return source.decode(
-            encoding=autoflake.detect_source_encoding(source),
+            encoding=detect_source_encoding(source),
         ).splitlines(keepends=True)
 
 
@@ -153,7 +156,7 @@ def process_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--command",
-        default=AUTOFLAKE_BIN,
+        default=AUTOFLAKE8_BIN,
         help="autoflake command (default: %(default)s)",
     )
 

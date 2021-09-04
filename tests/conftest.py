@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import os
 import pathlib
 import shutil
@@ -64,10 +65,17 @@ def root_dir() -> pathlib.Path:
 
 @pytest.fixture
 def autoflake8_command(root_dir: pathlib.Path) -> List[str]:
-    return [sys.executable, str(root_dir / "autoflake.py")]
+    return [sys.executable, str(root_dir / "autoflake8" / "cli.py")]
 
 
 @pytest.fixture
 def devnull() -> Iterator[IO[bytes]]:
     with open(os.devnull, "rb+") as f:
         yield f
+
+
+@pytest.fixture
+def logger() -> logging.Logger:
+    logger = logging.getLogger()
+    logger.addHandler(logging.NullHandler())
+    return logger

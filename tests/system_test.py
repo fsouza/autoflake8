@@ -1,4 +1,5 @@
 import io
+import logging
 import subprocess
 from contextlib import _GeneratorContextManager
 from typing import Callable
@@ -8,12 +9,13 @@ from unittest import mock
 
 import pytest
 
-import autoflake
+from autoflake8.cli import _main
 
 
 def test_diff(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -24,11 +26,11 @@ x = 1
 """,
     ) as filename:
         output_file = io.BytesIO()
-        autoflake._main(
+        _main(
             argv=["my_fake_program", filename],
             stdout=output_file,
-            stderr=devnull,
             stdin=devnull,
+            logger=logger,
         )
 
         expected = b"""\
@@ -41,20 +43,25 @@ x = 1
 
 
 def test_diff_with_nonexistent_file(devnull: IO[bytes]) -> None:
-    output_file = io.BytesIO()
-    autoflake._main(
+    output_file = io.StringIO()
+
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler(output_file))
+
+    _main(
         argv=["my_fake_program", "nonexistent_file"],
         stdout=devnull,
-        stderr=output_file,
         stdin=devnull,
+        logger=logger,
     )
 
-    assert b"no such file" in output_file.getvalue().lower()
+    assert "no such file" in output_file.getvalue().lower()
 
 
 def test_diff_with_encoding_declaration(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -66,11 +73,11 @@ x = 1
 """,
     ) as filename:
         output_file = io.BytesIO()
-        autoflake._main(
+        _main(
             argv=["my_fake_program", filename],
             stdout=output_file,
-            stderr=devnull,
             stdin=devnull,
+            logger=logger,
         )
         expected = b"""\
  # coding: iso-8859-1
@@ -86,6 +93,7 @@ x = 1
 def test_in_place(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -101,11 +109,11 @@ except ImportError:
 """,
     ) as filename:
         output_file = io.BytesIO()
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--in-place", filename],
             stdout=output_file,
-            stderr=devnull,
             stdin=devnull,
+            logger=logger,
         )
         with open(filename) as f:
             expected = """\
@@ -125,14 +133,15 @@ except ImportError:
 def test_check_with_empty_file(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file("") as filename:
         output_file = io.BytesIO()
 
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--check", filename],
             stdout=output_file,
-            stderr=devnull,
+            logger=logger,
             stdin=devnull,
         )
 
@@ -142,6 +151,7 @@ def test_check_with_empty_file(
 def test_check_correct_file(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -152,10 +162,10 @@ print(x)
     ) as filename:
         output_file = io.BytesIO()
 
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--check", filename],
             stdout=output_file,
-            stderr=devnull,
+            logger=logger,
             stdin=devnull,
         )
 
@@ -165,6 +175,7 @@ print(x)
 def test_check_useless_pass(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -185,10 +196,10 @@ except ImportError:
         output_file = io.BytesIO()
 
         with pytest.raises(SystemExit) as excinfo:
-            autoflake._main(
+            _main(
                 argv=["my_fake_program", "--check", filename],
                 stdout=output_file,
-                stderr=devnull,
+                logger=logger,
                 stdin=devnull,
             )
 
@@ -202,13 +213,14 @@ except ImportError:
 def test_in_place_with_empty_file(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file("") as filename:
         output_file = io.BytesIO()
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--in-place", filename],
             stdout=output_file,
-            stderr=devnull,
+            logger=logger,
             stdin=devnull,
         )
         with open(filename) as f:
@@ -218,6 +230,7 @@ def test_in_place_with_empty_file(
 def test_in_place_with_with_useless_pass(
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_file(
         """\
@@ -236,10 +249,10 @@ except ImportError:
 """,
     ) as filename:
         output_file = io.BytesIO()
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--in-place", filename],
             stdout=output_file,
-            stderr=devnull,
+            logger=logger,
             stdin=devnull,
         )
         with open(filename) as f:
@@ -257,13 +270,13 @@ except ImportError:
             assert f.read() == expected
 
 
-def test_with_missing_file(devnull: IO[bytes]) -> None:
+def test_with_missing_file(devnull: IO[bytes], logger: logging.Logger) -> None:
     output_file = mock.Mock()
 
-    autoflake._main(
+    _main(
         argv=["my_fake_program", "--in-place", ".fake"],
         stdout=output_file,
-        stderr=devnull,
+        logger=logger,
         stdin=devnull,
     )
 
@@ -274,6 +287,7 @@ def test_ignore_hidden_directories(
     temporary_directory: Callable[..., "_GeneratorContextManager[str]"],
     temporary_file: Callable[..., "_GeneratorContextManager[str]"],
     devnull: IO[bytes],
+    logger: logging.Logger,
 ) -> None:
     with temporary_directory() as directory:
         with temporary_directory(
@@ -291,24 +305,24 @@ import os
 
                 output_file = io.BytesIO()
 
-                autoflake._main(
+                _main(
                     argv=["my_fake_program", "--recursive", directory],
                     stdout=output_file,
-                    stderr=devnull,
+                    logger=logger,
                     stdin=devnull,
                 )
 
                 assert output_file.getvalue().strip() == b""
 
 
-def test_in_place_and_stdout(devnull: IO[bytes]) -> None:
+def test_in_place_and_stdout(devnull: IO[bytes], logger: logging.Logger) -> None:
     output_file = io.BytesIO()
     with pytest.raises(SystemExit):
-        autoflake._main(
+        _main(
             argv=["my_fake_program", "--in-place", "--stdout", __file__],
             stdout=output_file,
-            stderr=output_file,
             stdin=devnull,
+            logger=logger,
         )
 
 

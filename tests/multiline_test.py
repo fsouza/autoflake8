@@ -2,11 +2,11 @@ import functools
 from typing import Sequence
 from typing import Tuple
 
-import autoflake
+from autoflake8.fix import FilterMultilineImport
 
 
 def test_is_over_parens() -> None:
-    filt = autoflake.FilterMultilineImport(b"from . import (\n")
+    filt = FilterMultilineImport(b"from . import (\n")
 
     assert filt.is_over(b"module)\n") is True
     assert filt.is_over(b"  )\n") is True
@@ -19,7 +19,7 @@ def test_is_over_parens() -> None:
 
 
 def test_is_over_backslash() -> None:
-    filt = autoflake.FilterMultilineImport(b"from . import module, \\\n")
+    filt = FilterMultilineImport(b"from . import module, \\\n")
     assert filt.is_over(b"module\n") is True
     assert filt.is_over(b"\n") is True
     assert filt.is_over(b"m1, m2  # comment with \\\n") is True
@@ -30,7 +30,7 @@ def test_is_over_backslash() -> None:
 
 
 def test_is_over_multi_on_single_physical_line() -> None:
-    filt = autoflake.FilterMultilineImport(b"import os; import math, subprocess")
+    filt = FilterMultilineImport(b"import os; import math, subprocess")
     assert filt.is_over() is True
 
 
@@ -39,14 +39,12 @@ def assert_fix(
     result: bytes,
     unused: Tuple[bytes, ...] = (),
 ) -> None:
-    fixer = autoflake.FilterMultilineImport(
+    fixer = FilterMultilineImport(
         lines[0],
         unused_module=unused,
     )
     fixed = functools.reduce(
-        lambda acc, x: acc(x)
-        if isinstance(acc, autoflake.FilterMultilineImport)
-        else acc,
+        lambda acc, x: acc(x) if isinstance(acc, FilterMultilineImport) else acc,
         lines[1:],
         fixer(),
     )
