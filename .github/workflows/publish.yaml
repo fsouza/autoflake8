@@ -16,13 +16,6 @@ jobs:
       - run: pip install poetry pre-commit
         if: github.event.ref_type == 'tag'
 
-      - name: poetry cache
-        if: github.event.ref_type == 'tag'
-        uses: actions/cache@v2.1.6
-        with:
-          path: ~/.cache/pypoetry
-          key: "${{ hashFiles('poetry.lock') }}"
-
       - run: poetry install
         if: github.event.ref_type == 'tag'
 
