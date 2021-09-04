@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: 3.x
 
-      - run: pip install poetry
+      - run: pip install poetry pre-commit
         if: github.event.ref_type == 'tag'
 
       - name: poetry cache
@@ -23,7 +23,20 @@ jobs:
           path: ~/.cache/pypoetry
           key: "${{ hashFiles('poetry.lock') }}"
 
-      - run: poetry install --no-dev
+      - run: poetry install
+        if: github.event.ref_type == 'tag'
+
+      - run: poetry run pytest
+        if: github.event.ref_type == 'tag'
+
+      - name: pre-commit cache
+        if: github.event.ref_type == 'tag'
+        uses: actions/cache@v2.1.6
+        with:
+          path: ~/.cache/pre-commit
+          key: "${{ hashFiles('.pre-commit-config.yaml') }}"
+
+      - run: pre-commit run -a
         if: github.event.ref_type == 'tag'
 
       - run: poetry publish
