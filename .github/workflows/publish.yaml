@@ -36,7 +36,7 @@ jobs:
           path: ~/.cache/pre-commit
           key: "${{ hashFiles('.pre-commit-config.yaml') }}"
 
-      - run: pre-commit run -a
+      - run: pre-commit run --all-files --show-diff-on-failure
         if: github.event.ref_type == 'tag'
 
       - run: poetry publish
