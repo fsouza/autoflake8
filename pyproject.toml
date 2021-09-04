@@ -37,6 +37,7 @@ pyflakes = ">= 2.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
+pytest-xdist = "^2.3.0"
 
 [tool.poetry.scripts]
 autoflake8 = "autoflake8.cli:main"
@@ -44,3 +45,6 @@ autoflake8 = "autoflake8.cli:main"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "--numprocesses auto"
