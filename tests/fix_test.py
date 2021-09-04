@@ -1456,21 +1456,14 @@ def test_find_files(tmp_path: pathlib.Path, logger: logging.Logger) -> None:
     sub.mkdir()
     (sub / "c.py").write_text("")
 
-    cwd = pathlib.Path.cwd()
-
-    cwd = os.getcwd()
-    os.chdir(tmp_path)
-    try:
-        files = list(
-            find_files(["dir"], True, [str(exclude)], logger=logger),
-        )
-    finally:
-        os.chdir(cwd)
+    files = list(
+        find_files([str(tmp_path / "dir")], True, [str(exclude)], logger=logger),
+    )
 
     file_names = [os.path.basename(f) for f in files]
     assert "a.py" in file_names
-    assert "b.py" in file_names
-    assert "c.py" in file_names
+    assert "b.py" not in file_names
+    assert "c.py" not in file_names
 
 
 def test_exclude(
