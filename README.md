@@ -7,11 +7,6 @@
 *autoflake8* removes unused imports and unused variables from Python code. It
 makes use of [pyflakes](https://pypi.org/project/pyflakes/) to do this.
 
-By default, autoflake8 only removes unused imports for modules that are part of
-the standard library. (Other modules may have side effects that make them
-unsafe to remove automatically.) Removal of unused variables is also disabled
-by default.
-
 autoflake8 also removes useless ``pass`` statements.
 
 It's a maintained fork of [autoflake](https://github.com/myint/autoflake).
