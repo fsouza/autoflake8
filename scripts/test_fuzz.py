@@ -7,16 +7,18 @@ Pyflakes warnings is also confirmed to always improve.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import difflib
 import os
 import pathlib
 import shlex
 import shutil
-import subprocess
 import sys
 import tempfile
 from typing import IO
 from typing import Sequence
+
+import aiofiles
 
 from autoflake8.fix import check as autoflake8_check
 from autoflake8.fix import detect_source_encoding
@@ -33,41 +35,91 @@ else:
     END = ""
 
 
+class Autoflake8Error(Exception):
+    ...
+
+
+class Worker:
+    def __init__(
+        self,
+        queue: asyncio.Queue[str],
+        args: argparse.Namespace,
+        options: Sequence[str],
+    ) -> None:
+        self.queue = queue
+        self.args = args
+        self.options = options
+
+    async def run(self) -> None:
+        self.running = True
+        while self.running:
+            try:
+                filename = await asyncio.wait_for(self.queue.get(), timeout=1)
+            except asyncio.TimeoutError:
+                continue
+            else:
+                try:
+                    print(
+                        colored(f"--->  Testing with {filename}", YELLOW),
+                        file=sys.stderr,
+                    )
+
+                    await run(
+                        filename=filename,
+                        command=self.args.command,
+                        verbose=self.args.verbose,
+                        options=self.options,
+                    )
+                except Autoflake8Error as e:
+                    print(f"fuzz error: {e}", file=sys.stderr)
+                    if e.__cause__:
+                        print(f"caused by: {e.__cause__}", file=sys.stderr)
+                    raise
+
+    def stop(self) -> None:
+        self.running = False
+
+
 def colored(text, color):
     """Return color coded text."""
     return color + text + END
 
 
-def pyflakes_count(filename: str) -> int:
+async def pyflakes_count(filename: str) -> int:
     """Return pyflakes error count."""
-    with open(filename, "rb") as f:
-        return len(list(autoflake8_check(f.read())))
+    async with aiofiles.open(filename, "rb") as f:
+        return len(list(autoflake8_check(await f.read())))
 
 
-def readlines(filename: str) -> Sequence[str]:
+async def readlines(filename: str) -> Sequence[str]:
     """Return contents of file as a list of lines."""
-    with open(filename, "rb") as f:
-        source = f.read()
+    async with aiofiles.open(filename, "rb") as f:
+        source = await f.read()
 
         return source.decode(
             encoding=detect_source_encoding(source),
         ).splitlines(keepends=True)
 
 
-def diff(before: str, after: str) -> str:
+async def diff(before: str, after: str) -> str:
     """Return diff of two files."""
 
     return "".join(
-        difflib.unified_diff(readlines(before), readlines(after), before, after),
+        difflib.unified_diff(
+            await readlines(before),
+            await readlines(after),
+            before,
+            after,
+        ),
     )
 
 
-def run(
+async def run(
     filename: str,
     command: str,
     verbose: bool = False,
-    options: list[str] | None = None,
-) -> bool:
+    options: Sequence[str] | None = None,
+) -> None:
     """
     Run autoflake on file at filename.
 
@@ -78,74 +130,75 @@ def run(
 
     temp_directory: str | None = None
     try:
-        temp_directory = tempfile.mkdtemp()
-        return _run(filename, command, temp_directory, verbose, options)
+        temp_directory = await asyncio.to_thread(tempfile.mkdtemp)
+        await _run(filename, command, temp_directory, verbose, options)
     finally:
         if temp_directory is not None:
-            shutil.rmtree(temp_directory)
+            await asyncio.to_thread(shutil.rmtree, temp_directory)
 
 
-def _run(
+async def _run(
     filename: str,
     command: str,
     temp_directory: str,
     verbose: bool,
     options: list[str],
-) -> bool:
+) -> None:
     temp_filename = os.path.join(temp_directory, os.path.basename(filename))
 
-    shutil.copyfile(filename, temp_filename)
+    await asyncio.to_thread(shutil.copyfile, filename, temp_filename)
 
-    if 0 != subprocess.call(
-        shlex.split(command) + ["--in-place", temp_filename] + options,
-    ):
-        sys.stderr.write("autoflake crashed on " + filename + "\n")
-        return False
+    cmd = shlex.split(command)
+    proc = await asyncio.subprocess.create_subprocess_exec(
+        cmd[0],
+        *cmd[1:],
+        "--in-place",
+        temp_filename,
+        *options,
+    )
+
+    status = await proc.wait()
+    if status != 0:
+        raise Autoflake8Error(f"autoflake crashed on {filename}")
 
     try:
-        file_diff = diff(filename, temp_filename)
+        file_diff = await diff(filename, temp_filename)
         if verbose:
-            sys.stderr.write(file_diff)
+            print(file_diff, file=sys.stderr)
 
-        if check_syntax(filename):
+        if await check_syntax(filename):
             try:
-                check_syntax(temp_filename, raise_error=True)
+                await check_syntax(temp_filename, raise_error=True)
             except (
                 SyntaxError,
                 TypeError,
                 ValueError,
             ) as exc:
-                sys.stderr.write(
-                    f"autoflake broke {filename}\n{str(exc)}\n",
-                )
-                return False
+                raise Autoflake8Error(f"autoflake broke {filename}") from exc
 
-        before_count = pyflakes_count(filename)
-        after_count = pyflakes_count(temp_filename)
+        before_count = await pyflakes_count(filename)
+        after_count = await pyflakes_count(temp_filename)
 
         if verbose:
             print("(before, after):", (before_count, after_count))
 
         if file_diff and after_count > before_count:
-            sys.stderr.write(f"autoflake made {filename} worse\n")
-            return False
+            raise Autoflake8Error(f"autoflake made {filename} worse")
     except OSError as exc:
-        sys.stderr.write(f"{str(exc)}\n")
-
-    return True
+        raise Autoflake8Error("something went wrong") from exc
 
 
-def check_syntax(filename: str, raise_error: bool = False) -> bool:
+async def check_syntax(filename: str, raise_error: bool = False) -> bool:
     """Return True if syntax is okay."""
-    with open(filename) as input_file:
-        try:
-            compile(input_file.read(), "<string>", "exec", dont_inherit=True)
-            return True
-        except (SyntaxError, TypeError, ValueError):
-            if raise_error:
-                raise
-            else:
-                return False
+    try:
+        source = "".join(await readlines(filename))
+        compile(source, "<string>", "exec", dont_inherit=True)
+        return True
+    except (SyntaxError, TypeError, ValueError):
+        if raise_error:
+            raise
+        else:
+            return False
 
 
 def process_args() -> argparse.Namespace:
@@ -196,7 +249,7 @@ def process_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
+async def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
     """
     Run recursively run autoflake on directory of files.
 
@@ -212,7 +265,18 @@ def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
     if args.remove_unused_variables:
         options.append("--remove-unused-variables")
 
-    completed_filenames = set()
+    queue: asyncio.Queue[str] = asyncio.Queue()
+
+    print(f"starting {args.num_workers} workers")
+    workers = [
+        Worker(
+            queue=queue,
+            args=args,
+            options=options,
+        )
+        for _ in range(args.num_workers)
+    ]
+    worker_tasks = [asyncio.create_task(worker.run()) for worker in workers]
 
     files_to_skip = {"bad_coding.py", "badsyntax_pep3120.py"}
 
@@ -223,31 +287,22 @@ def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
             # Invalid symlink.
             continue
 
-        if filename in completed_filenames:
-            sys.stderr.write(
-                colored(f"--->  Skipping previously tested {filename}\n", YELLOW),
-            )
-            continue
-        else:
-            completed_filenames.update(filename)
-
         if basename not in files_to_skip:
-            sys.stderr.write(colored(f"--->  Testing with {filename}\n", YELLOW))
+            queue.put_nowait(filename)
 
-            if not run(
-                os.path.join(filename),
-                command=args.command,
-                verbose=args.verbose,
-                options=options,
-            ):
-                return False
+    await queue.join()
+    for w in workers:
+        w.stop()
+
+    await asyncio.gather(*worker_tasks)
 
     return True
 
 
 def main() -> int:
     """Run main."""
-    return 0 if check(process_args(), sys.stdin) else 1
+    result = asyncio.run(check(process_args(), sys.stdin))
+    return 0 if result else 1
 
 
 if __name__ == "__main__":
