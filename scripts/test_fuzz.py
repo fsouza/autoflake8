@@ -75,6 +75,8 @@ class Worker:
                     if e.__cause__:
                         print(f"caused by: {e.__cause__}", file=sys.stderr)
                     raise
+                finally:
+                    self.queue.task_done()
 
     def stop(self) -> None:
         self.running = False
