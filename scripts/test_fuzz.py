@@ -11,6 +11,7 @@ import asyncio
 import difflib
 import os
 import pathlib
+import random
 import shlex
 import shutil
 import sys
@@ -248,6 +249,15 @@ def process_args() -> argparse.Namespace:
         default=1,
     )
 
+    parser.add_argument(
+        "-m",
+        "--max-files",
+        type=int,
+        dest="max_files",
+        default=500,
+        help="max number of files to analyze (default: %(default)d)",
+    )
+
     return parser.parse_args()
 
 
@@ -269,7 +279,6 @@ async def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
 
     queue: asyncio.Queue[str] = asyncio.Queue()
 
-    print(f"starting {args.num_workers} workers")
     workers = [
         Worker(
             queue=queue,
@@ -282,8 +291,9 @@ async def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
 
     files_to_skip = {"bad_coding.py", "badsyntax_pep3120.py"}
 
-    for line in stdin.readlines():
-        filename = line.strip()
+    all_files = [line.strip() for line in stdin.readlines()]
+    random.shuffle(all_files)
+    for filename in all_files[: args.max_files]:
         basename = os.path.basename(filename)
         if not os.path.exists(filename):
             # Invalid symlink.
