@@ -32,4 +32,4 @@ jobs:
       - run: poetry install
 
       - name: run fuzz
-        run: poetry run python scripts/test_fuzz.py ${{ matrix.options }}
+        run: ./scripts/fuzz.sh

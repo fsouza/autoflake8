@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from typing import IO
 from typing import Sequence
 
 from autoflake8.fix import check as autoflake8_check
@@ -23,8 +24,6 @@ from autoflake8.fix import detect_source_encoding
 
 ROOT_PATH = pathlib.Path(__file__).parent.parent.absolute()
 AUTOFLAKE8_BIN = f"'{sys.executable}' '{ROOT_PATH / 'autoflake8' / 'cli.py'}'"
-
-print(AUTOFLAKE8_BIN)
 
 if sys.stdout.isatty():
     YELLOW = "\x1b[33m"
@@ -185,22 +184,24 @@ def process_args() -> argparse.Namespace:
         help="print verbose messages",
     )
 
-    parser.add_argument("files", nargs="*", help="files to test against")
+    parser.add_argument(
+        "-n",
+        "--num-workers",
+        type=int,
+        dest="num_workers",
+        help="number of workers to run (default: %(default)d)",
+        default=1,
+    )
 
     return parser.parse_args()
 
 
-def check(args: argparse.Namespace) -> bool:
+def check(args: argparse.Namespace, stdin: IO[str]) -> bool:
     """
     Run recursively run autoflake on directory of files.
 
     Return False if the fix results in broken syntax.
     """
-    if args.files:
-        dir_paths = args.files
-    else:
-        dir_paths = [path for path in sys.path if os.path.isdir(path)]
-
     options = []
     if args.expand_star_imports:
         options.append("--expand-star-imports")
@@ -211,40 +212,30 @@ def check(args: argparse.Namespace) -> bool:
     if args.remove_unused_variables:
         options.append("--remove-unused-variables")
 
-    filenames = dir_paths
     completed_filenames = set()
 
     files_to_skip = {"bad_coding.py", "badsyntax_pep3120.py"}
 
-    while filenames:
-        name = os.path.realpath(filenames.pop(0))
-        basename = os.path.basename(name)
-        if not os.path.exists(name):
+    for line in stdin.readlines():
+        filename = line.strip()
+        basename = os.path.basename(filename)
+        if not os.path.exists(filename):
             # Invalid symlink.
             continue
 
-        if name in completed_filenames:
+        if filename in completed_filenames:
             sys.stderr.write(
-                colored(f"--->  Skipping previously tested {name}\n", YELLOW),
+                colored(f"--->  Skipping previously tested {filename}\n", YELLOW),
             )
             continue
         else:
-            completed_filenames.update(name)
+            completed_filenames.update(filename)
 
-        if os.path.isdir(name):
-            for root, directories, children in os.walk(name):
-                filenames += [
-                    os.path.join(root, f)
-                    for f in children
-                    if f.endswith(".py") and not f.startswith(".")
-                ]
-
-                directories[:] = [d for d in directories if not d.startswith(".")]
-        elif basename not in files_to_skip:
-            sys.stderr.write(colored(f"--->  Testing with {name}\n", YELLOW))
+        if basename not in files_to_skip:
+            sys.stderr.write(colored(f"--->  Testing with {filename}\n", YELLOW))
 
             if not run(
-                os.path.join(name),
+                os.path.join(filename),
                 command=args.command,
                 verbose=args.verbose,
                 options=options,
@@ -256,7 +247,7 @@ def check(args: argparse.Namespace) -> bool:
 
 def main() -> int:
     """Run main."""
-    return 0 if check(process_args()) else 1
+    return 0 if check(process_args(), sys.stdin) else 1
 
 
 if __name__ == "__main__":
