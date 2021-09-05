@@ -59,3 +59,31 @@ jobs:
           key: "${{ hashFiles('.pre-commit-config.yaml') }}"
 
       - run: pre-commit run --all-files --show-diff-on-failure
+
+  fuzz:
+    strategy:
+      matrix:
+        options:
+          - ""
+          - "--expand-star-imports"
+          - "--remove-duplicate-keys"
+          - "--remove-unused-variables"
+          - "--remove-duplicate-keys --remove-unused-variables"
+          - "--expand-star-imports --remove-duplicate-keys"
+          - "--expand-star-imports --remove-duplicate-keys --remove-unused-variables"
+
+    name: fuzz (${{ matrix.options }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2.3.4
+
+      - uses: actions/setup-python@v2.2.2
+        with:
+          python-version: 3.x
+
+      - run: pip install poetry
+
+      - run: poetry install
+
+      - name: run fuzz
+        run: ./scripts/fuzz.sh ${{ matrix.options }} --max-files 250
