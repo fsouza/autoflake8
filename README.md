@@ -11,6 +11,22 @@ autoflake8 also removes useless ``pass`` statements.
 
 It's a maintained fork of [autoflake](https://github.com/myint/autoflake).
 
+## Differences from autoflake
+
+This fork of autoflake removed some features from autoflake and modified
+certain behaviors. The main motivations for those changes is the idea that
+autoflake8 is built for users of flake8 and it's assumed that if you're using
+autoflake8, you're also using flake8. This motivated the removal of the flags
+`--imports` and `--remove-all-unused-imports`: if you want to preserve an
+import for its side-effect, use `# noqa`.
+
+Additionally, `autoflake8` also supports load from `stdin` and printing to
+`stdout`, which makes it very easy for users to integrate with their custom
+editors.
+
+We also plan to eventually stop using regular expressions and rely on actual
+AST rewriting to fix issues reported by flake8.
+
 ## Example
 
 Running autoflake8 on the below example::
@@ -59,6 +75,20 @@ def foo():
 
 ```
 $ pip install --upgrade autoflake8
+```
+
+## Using as a pre-commit hook
+
+`autoflake8` can be used as a pre-commit hook. See
+[pre-commit](https://pre-commit.com/#plugins) for instructions.
+
+Sample `.pre-commit-config.yaml`:
+
+```yaml
+-   repo: https://github.com/fsouza/autoflake8
+    rev: v0.1.1
+    hooks:
+    -   id: autoflake8
 ```
 
 ## Advanced usage
