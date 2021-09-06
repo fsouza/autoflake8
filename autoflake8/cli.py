@@ -102,7 +102,6 @@ def _main(
     exit_status = 0
 
     filenames = list(set(args.files))
-    failure = False
     for name in find_files(
         filenames,
         args.recursive,

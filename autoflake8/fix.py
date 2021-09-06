@@ -22,6 +22,7 @@ from typing import Union
 import pyflakes.api
 import pyflakes.messages
 import pyflakes.reporter
+
 from autoflake8.multiline import _filter_imports
 from autoflake8.multiline import FilterMultilineImport
 from autoflake8.pending_fix import get_line_ending
