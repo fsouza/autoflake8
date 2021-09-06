@@ -657,7 +657,7 @@ def _fix_file(
         stdout.write(filtered_source)
     else:
         if args.check:
-            stdout.write(b"No issues detected!\n")
+            logger.info(b"No issues detected!\n")
         else:
             logger.debug("Clean %s: nothing to fix", filename)
 
