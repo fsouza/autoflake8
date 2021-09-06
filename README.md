@@ -24,8 +24,13 @@ Additionally, `autoflake8` also supports load from `stdin` and printing to
 `stdout`, which makes it very easy for users to integrate with their custom
 editors.
 
-We also plan to eventually stop using regular expressions and rely on actual
-AST rewriting to fix issues reported by flake8.
+Finally, a big difference is that `autoflake8` exits with status 1 when it
+detects issues/rewrite files. For editor integration, the new flag
+`--exit-zero-even-if-changed` can be used. When that flag is defined,
+`autoflake8` will return status 0 even when it modifies files.
+
+In terms of future plans, we also plan to eventually stop using regular
+expressions and rely on actual AST rewriting to fix issues reported by flake8.
 
 ## Example
 
