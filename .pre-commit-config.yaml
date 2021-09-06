@@ -38,7 +38,7 @@ repos:
   - repo: local
     hooks:
       - id: fix-version
-        name: version in pyproject.toml == autoflake8.__version__
+        name: ensure version consistency in docs, code and distribution
         language: python
         entry: scripts/fix_version.py
         pass_filenames: false
