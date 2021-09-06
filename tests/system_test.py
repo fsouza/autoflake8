@@ -8,7 +8,6 @@ from typing import List
 from unittest import mock
 
 import pytest
-
 from autoflake8.cli import _main
 
 
@@ -138,14 +137,14 @@ def test_check_with_empty_file(
     with temporary_file("") as filename:
         output_file = io.BytesIO()
 
-        _main(
+        status = _main(
             argv=["my_fake_program", "--check", filename],
             stdout=output_file,
             logger=logger,
             stdin=devnull,
         )
 
-        assert output_file.getvalue() == b"No issues detected!\n"
+        assert status == 0
 
 
 def test_check_correct_file(
@@ -162,14 +161,14 @@ print(x)
     ) as filename:
         output_file = io.BytesIO()
 
-        _main(
+        status = _main(
             argv=["my_fake_program", "--check", filename],
             stdout=output_file,
             logger=logger,
             stdin=devnull,
         )
 
-        assert output_file.getvalue() == b"No issues detected!\n"
+        assert status == 0
 
 
 def test_check_useless_pass(
@@ -195,15 +194,14 @@ except ImportError:
     ) as filename:
         output_file = io.BytesIO()
 
-        with pytest.raises(SystemExit) as excinfo:
-            _main(
-                argv=["my_fake_program", "--check", filename],
-                stdout=output_file,
-                logger=logger,
-                stdin=devnull,
-            )
+        exit_code = _main(
+            argv=["my_fake_program", "--check", filename],
+            stdout=output_file,
+            logger=logger,
+            stdin=devnull,
+        )
 
-        assert excinfo.value.code == 1
+        assert exit_code == 1
         assert (
             output_file.getvalue()
             == f"{filename}: Unused imports/variables detected".encode()

@@ -7,7 +7,6 @@ import io
 import logging
 import os
 import re
-import sys
 import tempfile
 import tokenize
 from typing import Dict
@@ -23,7 +22,6 @@ from typing import Union
 import pyflakes.api
 import pyflakes.messages
 import pyflakes.reporter
-
 from autoflake8.multiline import _filter_imports
 from autoflake8.multiline import FilterMultilineImport
 from autoflake8.pending_fix import get_line_ending
@@ -577,10 +575,10 @@ def fix_file(
     args: argparse.Namespace,
     stdout: IO[bytes],
     logger: logging.Logger,
-) -> None:
+) -> int:
     """Run fix_code() on a file."""
     with open(filename, "rb+") as input_file:
-        _fix_file(
+        return _fix_file(
             input_file,
             filename,
             args,
@@ -596,8 +594,8 @@ def fix_stdin(
     stdout: IO[bytes],
     args: argparse.Namespace,
     logger: logging.Logger,
-) -> None:
-    _fix_file(stdin, "<stdin>", args, True, stdout, logger)
+) -> int:
+    return _fix_file(stdin, "<stdin>", args, True, stdout, logger)
 
 
 def _fix_file(
@@ -607,7 +605,7 @@ def _fix_file(
     write_to_stdout: bool,
     stdout: IO[bytes],
     logger: logging.Logger,
-) -> None:
+) -> int:
     source = input_file.read()
     original_source = source
 
@@ -623,7 +621,8 @@ def _fix_file(
             stdout.write(
                 f"{filename}: Unused imports/variables detected".encode(),
             )
-            sys.exit(1)
+            return 1
+
         if write_to_stdout:
             stdout.write(filtered_source)
         elif args.in_place:
@@ -653,6 +652,8 @@ def _fix_file(
                 filename,
             )
             stdout.write(diff.encode())
+
+        return 1
     elif write_to_stdout:
         stdout.write(filtered_source)
     else:
@@ -660,6 +661,8 @@ def _fix_file(
             logger.info(b"No issues detected!\n")
         else:
             logger.debug("Clean %s: nothing to fix", filename)
+
+    return 0
 
 
 def get_diff_text(old: Sequence[str], new: Sequence[str], filename: str) -> str:

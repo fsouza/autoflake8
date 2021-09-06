@@ -24,7 +24,7 @@ def _main(
     0 means no error.
     """
 
-    parser = argparse.ArgumentParser(description=__doc__, prog="autoflake")
+    parser = argparse.ArgumentParser(description=__doc__, prog="autoflake8")
     parser.add_argument(
         "-c",
         "--check",
@@ -99,6 +99,8 @@ def _main(
     args = parser.parse_args(argv[1:])
     set_logging_level(logger, args.verbosity)
 
+    exit_status = 0
+
     filenames = list(set(args.files))
     failure = False
     for name in find_files(
@@ -108,7 +110,7 @@ def _main(
         logger=logger,
     ):
         if name == "-":
-            fix_stdin(
+            exit_status |= fix_stdin(
                 stdin=stdin,
                 stdout=stdout,
                 args=args,
@@ -116,7 +118,7 @@ def _main(
             )
         else:
             try:
-                fix_file(
+                exit_status |= fix_file(
                     filename=name,
                     args=args,
                     stdout=stdout,
@@ -124,9 +126,9 @@ def _main(
                 )
             except OSError as exception:
                 logger.error(str(exception))
-                failure = True
+                exit_status = 1
 
-    return 1 if failure else 0
+    return exit_status
 
 
 def make_logger(stderr: IO[str]) -> logging.Logger:
