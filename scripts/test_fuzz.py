@@ -161,7 +161,10 @@ async def _run(
     )
 
     status = await proc.wait()
-    if status != 0:
+
+    # status 1 is used for when the file needs to be fixed, anything bigger
+    # than 1 is some issue.
+    if status > 1:
         raise Autoflake8Error(f"autoflake crashed on {filename}")
 
     try:

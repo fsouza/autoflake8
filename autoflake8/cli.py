@@ -125,7 +125,7 @@ def _main(
                 )
             except OSError as exception:
                 logger.error(str(exception))
-                exit_status = 1
+                exit_status = 3
 
     return exit_status
 
