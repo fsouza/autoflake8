@@ -76,6 +76,7 @@ def _main(
         default=0,
         help="print more verbose logs (you can " "repeat `-v` to make it more verbose)",
     )
+    parser.add_argument("--exit-zero-even-if-changed", action="store_true")
     parser.add_argument("files", nargs="+", help="files to format")
 
     group = parser.add_mutually_exclusive_group()

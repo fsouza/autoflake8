@@ -654,7 +654,7 @@ def _fix_file(
             )
             stdout.write(diff.encode())
 
-        return 1
+        return 0 if args.exit_zero_even_if_changed else 1
     elif write_to_stdout:
         stdout.write(filtered_source)
     else:
