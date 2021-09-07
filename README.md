@@ -34,7 +34,7 @@ expressions and rely on actual AST rewriting to fix issues reported by flake8.
 
 ## Example
 
-Running autoflake8 on the below example::
+Running autoflake8 on the below example:
 
 ```
 $ autoflake8 --in-place --remove-unused-variables example.py
@@ -100,7 +100,7 @@ Sample `.pre-commit-config.yaml`:
 
 To remove unused variables, use the ``--remove-unused-variables`` option.
 
-Below is the full listing of options::
+Below is the full listing of options:
 
 ```
 usage: autoflake8 [-h] [-c] [-r] [--exclude globs] [--expand-star-imports] [--remove-duplicate-keys] [--remove-unused-variables] [--version] [-v] [--exit-zero-even-if-changed] [-i | -s] files [files ...]
@@ -129,7 +129,7 @@ optional arguments:
 
 ### Tests
 
-To run the unit tests::
+To run the unit tests:
 
 ```
 $ poetry run pytest
@@ -139,10 +139,10 @@ There is also a fuzz test, which runs against any collection of given Python
 files. It tests autoflake8 against the files and checks how well it does by
 running pyflakes on the file before and after. The test fails if the pyflakes
 results change for the worse. (This is done in memory. The actual files are
-left untouched.)::
+left untouched):
 
 ```
-$ poetry run scripts/test_fuzz.py
+$ scripts/fuzz.sh
 ```
 
 ## Excluding specific lines
