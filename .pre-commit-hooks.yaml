@@ -6,3 +6,6 @@
   require_serial: true
   args:
     - "--in-place"
+    - "--expand-star-imports"
+    - "--remove-duplicate-keys"
+    - "--remove-unused-variables"
