@@ -103,8 +103,7 @@ To remove unused variables, use the ``--remove-unused-variables`` option.
 Below is the full listing of options::
 
 ```
-％ poetry run autoflake8 --help
-usage: autoflake [-h] [-c] [-r] [--exclude globs] [--expand-star-imports] [--remove-duplicate-keys] [--remove-unused-variables] [--version] [-v] [-i | -s] files [files ...]
+usage: autoflake8 [-h] [-c] [-r] [--exclude globs] [--expand-star-imports] [--remove-duplicate-keys] [--remove-unused-variables] [--version] [-v] [--exit-zero-even-if-changed] [-i | -s] files [files ...]
 
 positional arguments:
   files                 files to format
@@ -122,6 +121,7 @@ optional arguments:
                         remove unused variables
   --version             show program's version number and exit
   -v, --verbose         print more verbose logs (you can repeat `-v` to make it more verbose)
+  --exit-zero-even-if-changed
   -i, --in-place        make changes to files instead of printing diffs
   -s, --stdout          print changed text to stdout. defaults to true when formatting stdin, or to false otherwise
 ```
