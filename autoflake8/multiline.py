@@ -47,7 +47,7 @@ class FilterMultilineImport(PendingFix):
 
         self.analyze(line)
 
-        PendingFix.__init__(self, imports)
+        super().__init__(imports)
 
     def is_over(self, line: Optional[bytes] = None) -> bool:
         """Return True if the multiline import statement is over."""
