@@ -184,7 +184,7 @@ class ListReporter(pyflakes.reporter.Reporter):
         Ignore errors from Reporter.
         """
         ignore = StubFile()
-        pyflakes.reporter.Reporter.__init__(self, ignore, ignore)
+        super().__init__(ignore, ignore)
         self.messages: List[pyflakes.messages.Message] = []
 
     def flake(self, message: pyflakes.messages.Message) -> None:
