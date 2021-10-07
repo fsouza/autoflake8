@@ -10,6 +10,7 @@ from typing import Iterable
 from typing import List
 
 import pytest
+
 from autoflake8.fix import break_up_import
 from autoflake8.fix import check
 from autoflake8.fix import detect_source_encoding

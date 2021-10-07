@@ -18,6 +18,7 @@ from typing import IO
 from typing import Sequence
 
 import aiofiles
+
 from autoflake8.fix import check as autoflake8_check
 from autoflake8.fix import detect_source_encoding
 
