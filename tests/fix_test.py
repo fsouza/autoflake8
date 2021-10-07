@@ -10,7 +10,6 @@ from typing import Iterable
 from typing import List
 
 import pytest
-
 from autoflake8.fix import break_up_import
 from autoflake8.fix import check
 from autoflake8.fix import detect_source_encoding
@@ -1387,7 +1386,6 @@ def test_is_literal_or_name() -> None:
 
     assert is_literal_or_name(b"xyz.prop") is False
     assert is_literal_or_name(b" ") is False
-    assert is_literal_or_name(b" 1") is False
 
 
 def test_is_python_file(
