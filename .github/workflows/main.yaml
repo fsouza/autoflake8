@@ -26,7 +26,7 @@ jobs:
     name: tests
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
 
       - uses: actions/setup-python@v2.2.2
         with:
@@ -44,7 +44,7 @@ jobs:
     name: pre-commit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
 
       - uses: actions/setup-python@v2.2.2
         with:
@@ -76,7 +76,7 @@ jobs:
     name: fuzz (${{ matrix.options }})
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
 
       - uses: actions/setup-python@v2.2.2
         with:
