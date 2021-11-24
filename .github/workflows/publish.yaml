@@ -24,7 +24,7 @@ jobs:
 
       - name: pre-commit cache
         if: github.event.ref_type == 'tag'
-        uses: actions/cache@v2.1.6
+        uses: actions/cache@v2.1.7
         with:
           path: ~/.cache/pre-commit
           key: "${{ hashFiles('.pre-commit-config.yaml') }}"
