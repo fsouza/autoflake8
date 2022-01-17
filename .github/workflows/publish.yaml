@@ -3,39 +3,31 @@ on: create
 
 jobs:
   release:
+    if: github.event.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2.4.0
-        if: github.event.ref_type == 'tag'
 
       - uses: actions/setup-python@v2.3.1
-        if: github.event.ref_type == 'tag'
         with:
           python-version: 3.x
 
       - run: pip install poetry pre-commit
-        if: github.event.ref_type == 'tag'
 
       - run: poetry install
-        if: github.event.ref_type == 'tag'
 
       - run: poetry run pytest
-        if: github.event.ref_type == 'tag'
 
       - name: pre-commit cache
-        if: github.event.ref_type == 'tag'
         uses: actions/cache@v2.1.7
         with:
           path: ~/.cache/pre-commit
           key: "${{ hashFiles('.pre-commit-config.yaml') }}"
 
       - run: pre-commit run --all-files --show-diff-on-failure
-        if: github.event.ref_type == 'tag'
 
       - run: poetry build
-        if: github.event.ref_type == 'tag'
 
       - run: poetry publish
-        if: github.event.ref_type == 'tag'
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
