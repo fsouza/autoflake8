@@ -91,7 +91,7 @@ Sample `.pre-commit-config.yaml`:
 
 ```yaml
 -   repo: https://github.com/fsouza/autoflake8
-    rev: v0.2.2
+    rev: v0.3.0
     hooks:
     -   id: autoflake8
 ```
