@@ -16,14 +16,14 @@ repos:
     hooks:
       - id: reorder-python-imports
         args:
-          - "--py36-plus"
+          - "--py37-plus"
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v2.31.0
     hooks:
       - id: pyupgrade
         args:
-          - "--py36-plus"
+          - "--py37-plus"
 
   - repo: https://github.com/asottile/add-trailing-comma
     rev: v2.2.1
