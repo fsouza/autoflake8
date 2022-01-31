@@ -83,34 +83,25 @@ def test_detect_source_encoding(source: bytes, expected: str) -> None:
 
 
 def test_unused_import_line_numbers() -> None:
-    assert (
-        list(
-            unused_import_line_numbers(check(b"import os\n")),
-        )
-        == [1]
-    )
+    assert list(
+        unused_import_line_numbers(check(b"import os\n")),
+    ) == [1]
 
 
 def test_unused_import_line_numbers_with_from() -> None:
-    assert (
-        list(
-            unused_import_line_numbers(
-                check(b"from os import path\n"),
-            ),
-        )
-        == [1]
-    )
+    assert list(
+        unused_import_line_numbers(
+            check(b"from os import path\n"),
+        ),
+    ) == [1]
 
 
 def test_unused_import_line_numbers_with_dot() -> None:
-    assert (
-        list(
-            unused_import_line_numbers(
-                check(b"import os.path\n"),
-            ),
-        )
-        == [1]
-    )
+    assert list(
+        unused_import_line_numbers(
+            check(b"import os.path\n"),
+        ),
+    ) == [1]
 
 
 @pytest.mark.parametrize(
