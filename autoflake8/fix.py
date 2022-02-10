@@ -620,7 +620,7 @@ def _fix_file(
     if original_source != filtered_source:
         if args.check:
             stdout.write(
-                f"{filename}: Unused imports/variables detected".encode(),
+                f"{filename}: Unused imports/variables detected\n".encode(),
             )
             return 1
 

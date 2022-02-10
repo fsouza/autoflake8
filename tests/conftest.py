@@ -46,7 +46,7 @@ def temporary_file() -> Callable[
 def temporary_directory() -> Callable[[str, str], "_GeneratorContextManager[str]"]:
     @contextlib.contextmanager
     def _fn(
-        directory=".",
+        directory=None,
         prefix="tmp.",
     ) -> Iterator[str]:
         dir_name = tempfile.mkdtemp(prefix=prefix, dir=directory)

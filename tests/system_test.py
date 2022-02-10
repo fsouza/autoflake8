@@ -205,7 +205,7 @@ except ImportError:
         assert exit_code == 1
         assert (
             output_file.getvalue()
-            == f"{filename}: Unused imports/variables detected".encode()
+            == f"{filename}: Unused imports/variables detected\n".encode()
         )
 
 
@@ -312,6 +312,46 @@ import os
                 )
 
                 assert output_file.getvalue().strip() == b""
+
+
+def test_check_with_multiple_errors(
+    temporary_directory: Callable[..., "_GeneratorContextManager[str]"],
+    temporary_file: Callable[..., "_GeneratorContextManager[str]"],
+    devnull: IO[bytes],
+    logger: logging.Logger,
+) -> None:
+    with temporary_directory() as directory:
+
+        with temporary_file(
+            """\
+import re
+import os
+""",
+            directory=directory,
+        ) as file1:
+            with temporary_file(
+                """\
+import sys
+""",
+                directory=directory,
+            ) as file2:
+                output_file = io.BytesIO()
+                status_code = _main(
+                    argv=["my_fake_program", "--recursive", directory, "--check"],
+                    stdout=output_file,
+                    logger=logger,
+                    stdin=devnull,
+                )
+
+                assert status_code == 1
+                expected_lines = {
+                    f"{file1}: Unused imports/variables detected\n".encode(),
+                    f"{file2}: Unused imports/variables detected\n".encode(),
+                }
+                assert (
+                    set(output_file.getvalue().splitlines(keepends=True))
+                    == expected_lines
+                )
 
 
 def test_in_place_and_stdout(devnull: IO[bytes], logger: logging.Logger) -> None:
