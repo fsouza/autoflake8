@@ -36,7 +36,7 @@ python = "^3.7"
 pyflakes = ">= 2.3.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^7.1.0"
+pytest = "^7.1.1"
 pytest-xdist = "^2.5.0"
 aiofiles = "^0.8.0"
 
