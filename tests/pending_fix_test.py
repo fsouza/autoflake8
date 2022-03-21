@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from autoflake8.pending_fix import get_line_ending

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
@@ -9,7 +11,6 @@ from contextlib import _GeneratorContextManager
 from typing import Callable
 from typing import IO
 from typing import Iterator
-from typing import List
 
 import pytest
 
@@ -17,7 +18,7 @@ import pytest
 @pytest.fixture
 def temporary_file() -> Callable[
     [str, str, str, str],
-    "_GeneratorContextManager[str]",
+    _GeneratorContextManager[str],
 ]:
     @contextlib.contextmanager
     def _fn(
@@ -43,7 +44,7 @@ def temporary_file() -> Callable[
 
 
 @pytest.fixture
-def temporary_directory() -> Callable[[str, str], "_GeneratorContextManager[str]"]:
+def temporary_directory() -> Callable[[str, str], _GeneratorContextManager[str]]:
     @contextlib.contextmanager
     def _fn(
         directory=None,
@@ -64,7 +65,7 @@ def root_dir() -> pathlib.Path:
 
 
 @pytest.fixture
-def autoflake8_command(root_dir: pathlib.Path) -> List[str]:
+def autoflake8_command(root_dir: pathlib.Path) -> list[str]:
     return [sys.executable, str(root_dir / "autoflake8" / "cli.py")]
 
 

@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import argparse
 import logging
 import signal
 import sys
 from typing import IO
 from typing import Sequence
-from typing import Set
 
 from autoflake8 import __version__
 from autoflake8.fix import find_files
@@ -150,7 +151,7 @@ def set_logging_level(logger: logging.Logger, verbosity: int) -> None:
     logger.setLevel(log_level)
 
 
-def _split_comma_separated(string: str) -> Set[str]:
+def _split_comma_separated(string: str) -> set[str]:
     """Return a set of strings."""
     return {text.strip() for text in string.split(",") if text.strip()}
 

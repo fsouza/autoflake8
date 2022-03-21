@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import ast
 import collections
@@ -9,15 +11,11 @@ import os
 import re
 import tempfile
 import tokenize
-from typing import Dict
 from typing import IO
 from typing import Iterable
 from typing import Iterator
-from typing import List
 from typing import Mapping
 from typing import Sequence
-from typing import Tuple
-from typing import Union
 
 import pyflakes.api
 import pyflakes.messages
@@ -75,7 +73,7 @@ def unused_import_line_numbers(
 
 def unused_import_module_name(
     messages: Iterable[pyflakes.messages.Message],
-) -> Iterator[Tuple[int, bytes]]:
+) -> Iterator[tuple[int, bytes]]:
     """Yield line number and module name of unused imports."""
     regex = re.compile("'(.+?)'")
     for message in messages:
@@ -97,7 +95,7 @@ def star_import_used_line_numbers(
 
 def star_import_usage_undefined_name(
     messages: Iterable[pyflakes.messages.Message],
-) -> Iterator[Tuple[int, bytes, bytes]]:
+) -> Iterator[tuple[int, bytes, bytes]]:
     """Yield line number, undefined name, and its possible origin module."""
     for message in messages:
         if isinstance(message, pyflakes.messages.ImportStarUsage):
@@ -150,7 +148,7 @@ def duplicate_key_line_numbers(
 
 def create_key_to_messages_dict(
     messages: Iterable[pyflakes.messages.MultiValueRepeatedKeyLiteral],
-) -> Mapping[str, List[pyflakes.messages.MultiValueRepeatedKeyLiteral]]:
+) -> Mapping[str, list[pyflakes.messages.MultiValueRepeatedKeyLiteral]]:
     """Return dict mapping the key to list of messages."""
     dictionary = collections.defaultdict(lambda: [])
     for message in messages:
@@ -185,7 +183,7 @@ class ListReporter(pyflakes.reporter.Reporter):
         """
         ignore = StubFile()
         super().__init__(ignore, ignore)
-        self.messages: List[pyflakes.messages.Message] = []
+        self.messages: list[pyflakes.messages.Message] = []
 
     def flake(self, message: pyflakes.messages.Message) -> None:
         """Accumulate messages."""
@@ -215,7 +213,7 @@ def is_multiline_statement(line: bytes, previous_line: bytes = b"") -> bool:
         return True
 
 
-def filter_from_import(line: bytes, unused_module: Tuple[bytes, ...]) -> bytes:
+def filter_from_import(line: bytes, unused_module: tuple[bytes, ...]) -> bytes:
     """
     Parse and filter ``from something import a, b, c``.
 
@@ -274,7 +272,7 @@ def filter_code(
     messages = check(source)
 
     marked_import_line_numbers = frozenset(unused_import_line_numbers(messages))
-    marked_unused_module: Dict[int, List[bytes]] = collections.defaultdict(lambda: [])
+    marked_unused_module: dict[int, list[bytes]] = collections.defaultdict(lambda: [])
     for line_number, module_name in unused_import_module_name(messages):
         marked_unused_module[line_number].append(module_name)
 
@@ -365,9 +363,9 @@ def filter_star_import(
 
 def filter_unused_import(
     line: bytes,
-    unused_module: Tuple[bytes, ...],
+    unused_module: tuple[bytes, ...],
     previous_line: bytes = b"",
-) -> Union[bytes, PendingFix]:
+) -> bytes | PendingFix:
     """Return line if used, otherwise return None."""
     # Ignore doctests.
     if line.lstrip().startswith(b">"):
@@ -739,7 +737,7 @@ def match_file(filename: str, exclude: Iterable[str], logger: logging.Logger) ->
 
 
 def find_files(
-    filenames: List[str],
+    filenames: list[str],
     recursive: bool,
     exclude: Iterable[str],
     logger: logging.Logger,

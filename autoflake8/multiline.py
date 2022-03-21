@@ -1,10 +1,9 @@
+from __future__ import annotations
+
 import re
 import string
 from typing import Iterable
-from typing import Optional
 from typing import Sequence
-from typing import Tuple
-from typing import Union
 
 from autoflake8.pending_fix import get_line_ending
 from autoflake8.pending_fix import PendingFix
@@ -30,7 +29,7 @@ class FilterMultilineImport(PendingFix):
     def __init__(
         self,
         line: bytes,
-        unused_module: Tuple[bytes, ...] = (),
+        unused_module: tuple[bytes, ...] = (),
         previous_line: bytes = b"",
     ):
         """Receive the same parameters as ``filter_unused_import``."""
@@ -49,7 +48,7 @@ class FilterMultilineImport(PendingFix):
 
         super().__init__(imports)
 
-    def is_over(self, line: Optional[bytes] = None) -> bool:
+    def is_over(self, line: bytes | None = None) -> bool:
         """Return True if the multiline import statement is over."""
         line = line or self.accumulator[-1]
 
@@ -108,8 +107,8 @@ class FilterMultilineImport(PendingFix):
 
     def __call__(
         self,
-        line: Optional[bytes] = None,
-    ) -> Union[bytes, "FilterMultilineImport"]:
+        line: bytes | None = None,
+    ) -> bytes | FilterMultilineImport:
         """Accumulate all the lines in the import and then trigger the fix."""
         if line:
             self.accumulator.append(line)
@@ -146,8 +145,8 @@ def _segment_module(segment: bytes) -> bytes:
 
 def _filter_imports(
     imports: Iterable[bytes],
-    parent: Optional[bytes] = None,
-    unused_module: Tuple[bytes, ...] = (),
+    parent: bytes | None = None,
+    unused_module: tuple[bytes, ...] = (),
 ) -> Sequence[bytes]:
     # We compare full module name (``a.module`` not `module`) to
     # guarantee the exact same module as detected from pyflakes.

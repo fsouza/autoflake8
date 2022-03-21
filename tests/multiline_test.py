@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import functools
 from typing import Sequence
-from typing import Tuple
 
 from autoflake8.multiline import FilterMultilineImport
 
@@ -37,7 +38,7 @@ def test_is_over_multi_on_single_physical_line() -> None:
 def assert_fix(
     lines: Sequence[bytes],
     result: bytes,
-    unused: Tuple[bytes, ...] = (),
+    unused: tuple[bytes, ...] = (),
 ) -> None:
     fixer = FilterMultilineImport(
         lines[0],

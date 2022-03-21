@@ -1,4 +1,6 @@
 """Test suite for """
+from __future__ import annotations
+
 import logging
 import os
 import pathlib
@@ -7,7 +9,6 @@ import subprocess
 from contextlib import _GeneratorContextManager
 from typing import Callable
 from typing import Iterable
-from typing import List
 
 import pytest
 
@@ -1381,7 +1382,7 @@ def test_is_literal_or_name() -> None:
 
 
 def test_is_python_file(
-    temporary_file: Callable[..., "_GeneratorContextManager[str]"],
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
     root_dir: pathlib.Path,
 ) -> None:
     assert is_python_file(str(root_dir / "autoflake8" / "cli.py")) is True
@@ -1420,7 +1421,7 @@ def test_is_exclude_file(filename: str, exclude: Iterable[str], expected: bool) 
 
 
 def test_match_file(
-    temporary_file: Callable[..., "_GeneratorContextManager[str]"],
+    temporary_file: Callable[..., _GeneratorContextManager[str]],
     logger: logging.Logger,
 ) -> None:
     with temporary_file("", suffix=".py", prefix=".") as filename:
@@ -1457,8 +1458,8 @@ def test_find_files(tmp_path: pathlib.Path, logger: logging.Logger) -> None:
 
 
 def test_exclude(
-    autoflake8_command: List[str],
-    temporary_directory: Callable[..., "_GeneratorContextManager[str]"],
+    autoflake8_command: list[str],
+    temporary_directory: Callable[..., _GeneratorContextManager[str]],
 ) -> None:
     with temporary_directory(directory=".") as temp_directory:
         with open(os.path.join(temp_directory, "a.py"), "w") as output:
