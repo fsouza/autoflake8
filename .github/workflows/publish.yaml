@@ -19,7 +19,7 @@ jobs:
       - run: poetry run pytest
 
       - name: pre-commit cache
-        uses: actions/cache@v2.1.7
+        uses: actions/cache@v3.0.0
         with:
           path: ~/.cache/pre-commit
           key: "${{ hashFiles('.pre-commit-config.yaml') }}"
