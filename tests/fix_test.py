@@ -1334,7 +1334,7 @@ def foo():
 
 @abc.abstractmethod
 def bar():
-    \"\"\" 
+    \"\"\"
         Also this is not a useless 'pass'.
     \"\"\"
     pass
@@ -1343,7 +1343,7 @@ def bar():
         filter_useless_pass(
             source,
             keep_pass_after_docstring=True,
-        )
+        ),
     )
 
 

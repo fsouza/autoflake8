@@ -537,7 +537,7 @@ def filter_useless_pass(
                 useless_pass_line_numbers(
                     source,
                     keep_pass_after_docstring,
-                )
+                ),
             )
         except (SyntaxError, tokenize.TokenError):
             marked_lines = frozenset()
