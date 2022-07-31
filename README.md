@@ -7,7 +7,7 @@
 *autoflake8* removes unused imports and unused variables from Python code. It
 makes use of [pyflakes](https://pypi.org/project/pyflakes/) to do this.
 
-autoflake8 also removes useless ``pass`` statements.
+autoflake8 also removes useless ``pass`` statements by default.
 
 It's a maintained fork of [autoflake](https://github.com/myint/autoflake).
 
@@ -119,6 +119,10 @@ optional arguments:
                         remove all duplicate keys in objects
   --remove-unused-variables
                         remove unused variables
+  --keep-pass-statements
+                        keep all `pass` statements
+  --keep-pass-after-docstring
+                        keep `pass` statements after a newline ending on """
   --version             show program's version number and exit
   -v, --verbose         print more verbose logs (you can repeat `-v` to make it more verbose)
   --exit-zero-even-if-changed

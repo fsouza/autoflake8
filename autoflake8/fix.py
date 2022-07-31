@@ -472,7 +472,10 @@ def is_literal_or_name(value: bytes) -> bool:
     return re.match(rb"^\w+\s*$", value) is not None
 
 
-def useless_pass_line_numbers(source: bytes) -> Iterator[int]:
+def useless_pass_line_numbers(
+    source: bytes,
+    keep_pass_after_docstring=False,
+) -> Iterator[int]:
     """Yield line numbers of unneeded "pass" statements."""
     sio = io.StringIO(source.decode(encoding=detect_source_encoding(source)))
     previous_token_type = None
@@ -499,24 +502,45 @@ def useless_pass_line_numbers(source: bytes) -> Iterator[int]:
             last_pass_row = start_row
             last_pass_indentation = get_indentation(line)
 
-        # Trailing "pass".
-        if (
-            is_pass
-            and previous_token_type != tokenize.INDENT
-            and not previous_line.rstrip().endswith(b"\\")
-        ):
-            yield start_row
+            is_trailing_pass = (
+                previous_token_type != tokenize.INDENT
+                and not previous_line.rstrip().endswith(b"\\")
+            )
+
+            is_pass_after_docstring = (
+                previous_token_type == tokenize.NEWLINE
+                and previous_line.rstrip().endswith(b'"""')
+            )
+
+            # Trailing "pass".
+            if is_trailing_pass:
+                if keep_pass_after_docstring and is_pass_after_docstring:
+                    pass
+                else:
+                    yield start_row
 
         previous_token_type = token_type
         previous_line = line
 
 
-def filter_useless_pass(source: bytes) -> Iterator[bytes]:
+def filter_useless_pass(
+    source: bytes,
+    keep_pass_statements=False,
+    keep_pass_after_docstring=False,
+) -> Iterator[bytes]:
     """Yield code with useless "pass" lines removed."""
-    try:
-        marked_lines = frozenset(useless_pass_line_numbers(source))
-    except (SyntaxError, tokenize.TokenError):
+    if keep_pass_statements:
         marked_lines = frozenset()
+    else:
+        try:
+            marked_lines = frozenset(
+                useless_pass_line_numbers(
+                    source,
+                    keep_pass_after_docstring,
+                )
+            )
+        except (SyntaxError, tokenize.TokenError):
+            marked_lines = frozenset()
 
     for line_number, line in enumerate(source.splitlines(keepends=True), start=1):
         if line_number not in marked_lines:
@@ -537,6 +561,8 @@ def fix_code(
     expand_star_imports: bool = False,
     remove_duplicate_keys: bool = False,
     remove_unused_variables: bool = False,
+    keep_pass_statements: bool = False,
+    keep_pass_after_docstring: bool = False,
 ) -> bytes:
     """Return code with all filtering run on it."""
     if not source:
@@ -558,6 +584,8 @@ def fix_code(
                         remove_unused_variables=remove_unused_variables,
                     ),
                 ),
+                keep_pass_statements=keep_pass_statements,
+                keep_pass_after_docstring=keep_pass_after_docstring,
             ),
         )
 
@@ -613,6 +641,8 @@ def _fix_file(
         expand_star_imports=args.expand_star_imports,
         remove_duplicate_keys=args.remove_duplicate_keys,
         remove_unused_variables=args.remove_unused_variables,
+        keep_pass_statements=args.keep_pass_statements,
+        keep_pass_after_docstring=args.keep_pass_after_docstring,
     )
 
     if original_source != filtered_source:

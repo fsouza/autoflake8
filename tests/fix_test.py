@@ -1120,6 +1120,66 @@ print(a)
     assert fix_code(code, remove_duplicate_keys=True) == code
 
 
+def test_fix_code_keeps_pass_statements() -> None:
+    code = b"""\
+if True:
+    pass
+else:
+    def foo():
+        \"\"\" A docstring. \"\"\"
+        pass
+    def bar():
+        # abc
+        pass
+    def blah():
+        123
+        pass
+        pass  # Nope.
+        pass
+"""
+
+    assert fix_code(code, keep_pass_statements=True) == code
+
+
+def test_fix_code_keeps_passes_after_docstrings() -> None:
+    result = fix_code(
+        b"""\
+if True:
+    pass
+else:
+    def foo():
+        \"\"\" A docstring. \"\"\"
+        pass
+    def bar():
+        # abc
+        pass
+    def blah():
+        123
+        pass
+        pass  # Nope.
+        pass
+""",
+        keep_pass_after_docstring=True,
+    )
+
+    expected = b"""\
+if True:
+    pass
+else:
+    def foo():
+        \"\"\" A docstring. \"\"\"
+        pass
+    def bar():
+        # abc
+        pass
+    def blah():
+        123
+        pass  # Nope.
+"""
+
+    assert expected == result
+
+
 def test_useless_pass_line_numbers() -> None:
     assert list(useless_pass_line_numbers(b"pass\n")) == [1]
 
@@ -1128,6 +1188,37 @@ def test_useless_pass_line_numbers() -> None:
 
 def test_useless_pass_line_numbers_with_escaped_newline() -> None:
     assert list(useless_pass_line_numbers(b"if True:\\\n    pass\n")) == []
+
+
+def test_useless_pass_line_numbers_after_docstring() -> None:
+    result = list(
+        useless_pass_line_numbers(
+            b"""\
+@abc.abstractmethod
+def some_abstract_method():
+    \"\"\"Some docstring.\"\"\"
+    pass
+""",
+        ),
+    )
+
+    assert result == [4]
+
+
+def test_useless_pass_line_numbers_keep_pass_after_docstring() -> None:
+    result = list(
+        useless_pass_line_numbers(
+            b"""\
+@abc.abstractmethod
+def some_abstract_method():
+    \"\"\"Some docstring.\"\"\"
+    pass
+""",
+            keep_pass_after_docstring=True,
+        ),
+    )
+
+    assert result == []
 
 
 def test_useless_pass_line_numbers_with_more_complex() -> None:
@@ -1233,6 +1324,44 @@ else:
 """
 
     assert result == expected
+
+
+def test_filter_useless_pass_keep_pass_after_docstring() -> None:
+    source = b"""\
+def foo():
+    \"\"\" This is not a useless 'pass'. \"\"\"
+    pass
+
+@abc.abstractmethod
+def bar():
+    \"\"\" 
+        Also this is not a useless 'pass'.
+    \"\"\"
+    pass
+"""
+    assert source == b"".join(
+        filter_useless_pass(
+            source,
+            keep_pass_after_docstring=True,
+        )
+    )
+
+
+def test_filter_useless_pass_keeps_pass_statements() -> None:
+    source = b"""\
+if True:
+    pass
+    pass
+    pass
+    pass
+else:
+    pass
+    True
+    x = 1
+    pass
+"""
+
+    assert source == b"".join(filter_useless_pass(source, keep_pass_statements=True))
 
 
 def test_filter_useless_pass_with_try() -> None:

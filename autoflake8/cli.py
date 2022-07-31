@@ -65,6 +65,16 @@ def _main(
         help="remove unused variables",
     )
     parser.add_argument(
+        "--keep-pass-statements",
+        action="store_true",
+        help="keep all pass statements",
+    )
+    parser.add_argument(
+        "--keep-pass-after-docstring",
+        action="store_true",
+        help='keep pass statements after a newline ending on \'"""\'',
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version="%(prog)s " + __version__,
