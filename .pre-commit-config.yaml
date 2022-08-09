@@ -33,7 +33,7 @@ repos:
       - id: add-trailing-comma
 
   - repo: https://github.com/pycqa/flake8
-    rev: 5.0.2
+    rev: 5.0.4
     hooks:
       - id: flake8
 
