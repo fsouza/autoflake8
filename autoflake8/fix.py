@@ -474,7 +474,7 @@ def is_literal_or_name(value: bytes) -> bool:
 
 def useless_pass_line_numbers(
     source: bytes,
-    keep_pass_after_docstring=False,
+    keep_pass_after_docstring: bool = False,
 ) -> Iterator[int]:
     """Yield line numbers of unneeded "pass" statements."""
     sio = io.StringIO(source.decode(encoding=detect_source_encoding(source)))
@@ -515,7 +515,7 @@ def useless_pass_line_numbers(
             # Trailing "pass".
             if is_trailing_pass:
                 if keep_pass_after_docstring and is_pass_after_docstring:
-                    pass
+                    continue
                 else:
                     yield start_row
 
