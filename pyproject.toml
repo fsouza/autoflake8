@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "autoflake8"
-version = "0.3.2"
+version = "0.4.0"
 description = "Tool to automatically fix some issues reported by flake8 (forked from autoflake)."
 authors = [
   "Francisco Souza <fsouza@users.noreply.github.com>",
