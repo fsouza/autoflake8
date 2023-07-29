@@ -22,7 +22,7 @@ jobs:
     name: tests
     runs-on: ${{ matrix.os }}-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.5.3
 
       - uses: actions/setup-python@v4.7.0
         with:
@@ -40,7 +40,7 @@ jobs:
     name: pre-commit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.5.3
 
       - uses: actions/setup-python@v4.7.0
         with:
@@ -72,7 +72,7 @@ jobs:
     name: fuzz (${{ matrix.options }})
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3.0.2
+      - uses: actions/checkout@v3.5.3
 
       - uses: actions/setup-python@v4.7.0
         with:
